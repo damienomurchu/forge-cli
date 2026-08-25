@@ -216,5 +216,11 @@ the directory without following links, verifies effective-user ownership before
 correcting permissions to `0700`, and returns the verified open handle for later
 descriptor-relative database operations.
 
+Database files are opened relative to that verified directory handle and without
+following links. Read-only and existing read-write modes never create a missing
+file; create mode atomically opens or creates it with mode `0600`. Every mode
+rejects symbolic links and non-regular files, verifies effective-user ownership
+before correcting permissions to `0600`, and returns a verified open handle.
+
 Importing the archived Python database is outside this schema. If demand exists,
 provide an explicit importer that validates and converts records into this model.

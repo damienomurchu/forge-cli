@@ -337,8 +337,8 @@ Current implementation status:
   performance harness, data-free CLI shell, domain model, and presentation
   foundations are established.
 - Phase 4, secure storage, is in progress; centralized read-only path resolution
-  and secure data-directory preparation are implemented. Secure database-file
-  opening is next.
+  and secure data-directory and database-file opening are implemented. SQLite
+  connection setup is next.
 - Phases 5 through 8 remain planned and unimplemented.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.
