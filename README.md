@@ -14,8 +14,8 @@ secure preparation and opening of owned, private data directories and database
 files, plus single-connection SQLite setup with required pragmas. Transactional
 migration inspection and application are also implemented. Repository creation is
 implemented for both captures and friction, and lookup by record ID is implemented;
-unfiltered newest-first repository listing is also implemented. List filters and
-repository updates are next.
+newest-first repository listing supports type, project, status, and limit filters.
+Repository status updates are next.
 
 ### Command availability
 

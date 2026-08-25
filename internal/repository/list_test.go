@@ -14,7 +14,7 @@ import (
 
 func TestListReturnsNonNilEmptySlice(t *testing.T) {
 	repository, _ := openTestRepository(t)
-	records, err := repository.List(context.Background())
+	records, err := repository.List(context.Background(), ListOptions{})
 	if err != nil {
 		t.Fatalf("List() error = %v", err)
 	}
@@ -58,7 +58,7 @@ func TestListReturnsMixedRecordsNewestFirst(t *testing.T) {
 		t.Fatalf("CreateFriction() error = %v", err)
 	}
 
-	got, err := repository.List(context.Background())
+	got, err := repository.List(context.Background(), ListOptions{})
 	if err != nil {
 		t.Fatalf("List() error = %v", err)
 	}
@@ -93,11 +93,139 @@ func TestListFailsWholeOperationForMalformedRecord(t *testing.T) {
 		t.Fatalf("corrupt timestamp error = %v", err)
 	}
 
-	got, err := repository.List(context.Background())
+	got, err := repository.List(context.Background(), ListOptions{})
 	if got != nil {
 		t.Errorf("List() = %#v, want nil after failure", got)
 	}
 	if err == nil || !strings.Contains(err.Error(), "decode listed record") {
 		t.Fatalf("List() error = %v, want decode error", err)
+	}
+}
+
+func TestListAppliesFiltersAndLimit(t *testing.T) {
+	repository, _ := openTestRepository(t)
+	newestCapture := newTestCapture(t, domain.CaptureInput{
+		Description: "Newest Forge capture",
+		Project:     "forge",
+		Kind:        domain.CaptureKindIdea,
+		Tags:        "filtered,ordered",
+	}, 43)
+	forgeFriction := newTestFriction(t, domain.FrictionInput{
+		Description: "Forge friction under review",
+		Project:     "forge",
+		Frequency:   domain.FrequencyWeekly,
+		Impact:      domain.ImpactHigh,
+		Category:    domain.CategoryVerification,
+	}, 42)
+	forgeFriction.Status = domain.StatusReviewing
+	otherCapture := newTestCapture(t, domain.CaptureInput{
+		Description: "Other project capture",
+		Project:     "other",
+		Kind:        domain.CaptureKindQuestion,
+	}, 41)
+	oldestFriction := newTestFriction(t, domain.FrictionInput{
+		Description: "Unassigned friction",
+		Frequency:   domain.FrequencyUnknown,
+		Impact:      domain.ImpactUnknown,
+		Category:    domain.CategoryOther,
+	}, 40)
+	ordered := []struct {
+		record *domain.Record
+		minute int
+	}{
+		{record: &newestCapture, minute: 4},
+		{record: &forgeFriction, minute: 3},
+		{record: &otherCapture, minute: 2},
+		{record: &oldestFriction, minute: 1},
+	}
+	for _, item := range ordered {
+		timestamp := domain.NewTimestamp(time.Date(2026, time.August, 25, 10, item.minute, 0, 0, time.UTC))
+		item.record.CreatedAt, item.record.UpdatedAt = timestamp, timestamp
+	}
+
+	for _, record := range []domain.Record{otherCapture, forgeFriction, oldestFriction, newestCapture} {
+		var err error
+		if record.Type == domain.RecordTypeCapture {
+			err = repository.CreateCapture(context.Background(), record)
+		} else {
+			err = repository.CreateFriction(context.Background(), record)
+		}
+		if err != nil {
+			t.Fatalf("store %s error = %v", record.ID, err)
+		}
+	}
+
+	captureType := domain.RecordTypeCapture
+	frictionType := domain.RecordTypeFriction
+	forgeProject := "forge"
+	reviewingStatus := domain.StatusReviewing
+	limitTwo := 2
+	tests := []struct {
+		name    string
+		options ListOptions
+		want    []domain.Record
+	}{
+		{name: "type", options: ListOptions{Type: &captureType}, want: []domain.Record{newestCapture, otherCapture}},
+		{name: "project", options: ListOptions{Project: &forgeProject}, want: []domain.Record{newestCapture, forgeFriction}},
+		{name: "status", options: ListOptions{Status: &reviewingStatus}, want: []domain.Record{forgeFriction}},
+		{
+			name: "combined",
+			options: ListOptions{
+				Type:    &frictionType,
+				Project: &forgeProject,
+				Status:  &reviewingStatus,
+			},
+			want: []domain.Record{forgeFriction},
+		},
+		{name: "limit after ordering", options: ListOptions{Limit: &limitTwo}, want: []domain.Record{newestCapture, forgeFriction}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := repository.List(context.Background(), tt.options)
+			if err != nil {
+				t.Fatalf("List() error = %v", err)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("List() = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestListRejectsInvalidOptionsBeforeQuerying(t *testing.T) {
+	repository, db := openTestRepository(t)
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	invalidType := domain.RecordType("invalid")
+	blankProject := " "
+	unnormalizedProject := " forge "
+	invalidStatus := domain.Status("invalid")
+	zeroLimit := 0
+	negativeLimit := -1
+	tests := []struct {
+		name    string
+		options ListOptions
+		field   string
+	}{
+		{name: "type", options: ListOptions{Type: &invalidType}, field: "record type"},
+		{name: "blank project", options: ListOptions{Project: &blankProject}, field: "project"},
+		{name: "unnormalized project", options: ListOptions{Project: &unnormalizedProject}, field: "project"},
+		{name: "status", options: ListOptions{Status: &invalidStatus}, field: "status"},
+		{name: "zero limit", options: ListOptions{Limit: &zeroLimit}, field: "limit"},
+		{name: "negative limit", options: ListOptions{Limit: &negativeLimit}, field: "limit"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := repository.List(context.Background(), tt.options)
+			if got != nil {
+				t.Errorf("List() = %#v, want nil", got)
+			}
+			if err == nil || !strings.Contains(err.Error(), "invalid "+tt.field) {
+				t.Fatalf("List() error = %v, want invalid %s", err, tt.field)
+			}
+		})
 	}
 }

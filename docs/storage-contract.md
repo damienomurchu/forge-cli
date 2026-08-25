@@ -198,10 +198,12 @@ domain record, loads capture tags by ascending position, distinguishes missing
 records from operational failures, and rejects malformed stored values or tag
 positions.
 
-Unfiltered read-only listing is implemented with deterministic
+Read-only listing is implemented with deterministic
 `created_at DESC, id DESC` ordering. The primary result set is closed before tag
 hydration to preserve the single-connection limit, empty results are represented
 by a non-null empty collection, and one malformed row fails the whole operation.
+Optional type, project, and status filters combine with AND semantics, and an
+optional positive limit is applied after filtering and deterministic ordering.
 
 ## Initialization and read-only commands
 
