@@ -17,9 +17,10 @@ implemented for both captures and friction, and lookup by record ID is implement
 newest-first repository listing supports type, project, status, and limit filters.
 Atomic repository status updates are also implemented. The specialized review
 query is implemented, completing the planned repository surface. Secure storage
-now has distinct create-or-open and open-existing directory primitives; lifecycle
-assembly has begun with owned, schema-checked open-existing sessions. The
-create-and-migrate lifecycle is next.
+now has distinct create-or-open and open-existing directory primitives. Owned
+storage sessions support both schema-checked access to existing databases and
+transactional creation and migration, completing Phase 4 secure storage. Phase 5
+non-interactive command slices are next.
 
 ### Command availability
 

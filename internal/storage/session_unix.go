@@ -37,12 +37,9 @@ func OpenExisting(
 	if mode != DatabaseReadOnly && mode != DatabaseReadWrite {
 		return nil, fmt.Errorf("open-existing storage requires read-only or read-write mode")
 	}
-	if !filepath.IsAbs(databasePath) {
-		return nil, fmt.Errorf("database path must be absolute")
-	}
-	databasePath = filepath.Clean(databasePath)
-	if filepath.Base(databasePath) != databaseFilename {
-		return nil, fmt.Errorf("database path must end with %s", databaseFilename)
+	databasePath, err := validateSessionDatabasePath(databasePath)
+	if err != nil {
+		return nil, err
 	}
 
 	directory, err := OpenDataDirectory(filepath.Dir(databasePath), effectiveUID)
@@ -78,6 +75,40 @@ func OpenExisting(
 			state.Version,
 			LatestSchemaVersion,
 		))
+	}
+	return session, nil
+}
+
+// OpenForCreation creates missing Forge storage, opens it read-write, and
+// transactionally applies every pending migration. Existing current storage is
+// opened without schema changes.
+func OpenForCreation(
+	ctx context.Context,
+	databasePath string,
+	effectiveUID int,
+) (*Session, error) {
+	databasePath, err := validateSessionDatabasePath(databasePath)
+	if err != nil {
+		return nil, err
+	}
+
+	directory, err := PrepareDataDirectory(filepath.Dir(databasePath), effectiveUID)
+	if err != nil {
+		return nil, fmt.Errorf("prepare data directory: %w", err)
+	}
+	session := &Session{directory: directory}
+	database, err := OpenDatabaseFile(directory, DatabaseCreate, effectiveUID)
+	if err != nil {
+		return nil, closeFailedSession(session, fmt.Errorf("prepare database file: %w", err))
+	}
+	session.database = database
+	db, err := OpenSQLite(ctx, directory, database, DatabaseCreate)
+	if err != nil {
+		return nil, closeFailedSession(session, fmt.Errorf("open sqlite database for creation: %w", err))
+	}
+	session.db = db
+	if err := ApplyMigrations(ctx, db); err != nil {
+		return nil, closeFailedSession(session, fmt.Errorf("migrate database for creation: %w", err))
 	}
 	return session, nil
 }
@@ -130,4 +161,15 @@ func closeFailedSession(session *Session, failure error) error {
 		return errors.Join(failure, closeErr)
 	}
 	return failure
+}
+
+func validateSessionDatabasePath(databasePath string) (string, error) {
+	if !filepath.IsAbs(databasePath) {
+		return "", fmt.Errorf("database path must be absolute")
+	}
+	databasePath = filepath.Clean(databasePath)
+	if filepath.Base(databasePath) != databaseFilename {
+		return "", fmt.Errorf("database path must end with %s", databaseFilename)
+	}
+	return databasePath, nil
 }

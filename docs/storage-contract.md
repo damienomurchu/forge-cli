@@ -234,6 +234,11 @@ handle, and configured SQLite pool, closing them in reverse order. It supports
 read-only and read-write access, classifies missing storage, rejects any schema
 that is not current, and never creates storage or applies migrations.
 
+The record-creation lifecycle uses the same owned session while securely creating
+missing storage and opening SQLite read-write. It transactionally applies pending
+migrations, reuses current databases without schema changes, rejects newer
+schemas, and closes every acquired resource if initialization fails.
+
 ## Index policy
 
 The initial indexes correspond to newest-first listing and individual type, status,

@@ -336,17 +336,18 @@ Current implementation status:
 - Phases 0 through 3 are complete: product contracts, dependency risk spikes, the
   performance harness, data-free CLI shell, domain model, and presentation
   foundations are established.
-- Phase 4, secure storage, is in progress; centralized read-only path resolution
+- Phase 4, secure storage, is complete: centralized read-only path resolution
   and secure data-directory and database-file opening are implemented. SQLite
   connection setup with required pragmas is implemented; transactional migrations
   and transactional capture and friction insertion are also implemented.
   Repository lookup by record ID and filtered newest-first listing are
   implemented, along with atomic status updates. The specialized review query is
   also implemented, completing the planned repository surface. Secure storage
-  now distinguishes create-or-open from open-existing directory access; lifecycle
-  assembly has begun with owned, schema-checked open-existing sessions. The
-  create-and-migrate lifecycle is next.
-- Phases 5 through 8 remain planned and unimplemented.
+  now distinguishes create-or-open from open-existing directory access. Owned
+  storage sessions support both schema-checked access to existing databases and
+  transactional creation and migration.
+- Phases 5 through 8 remain planned and unimplemented; Phase 5 non-interactive
+  command slices are next.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.
 

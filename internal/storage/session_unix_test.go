@@ -27,6 +27,147 @@ func TestOpenExistingReadOnlySession(t *testing.T) {
 	}
 }
 
+func TestOpenForCreationInitializesFirstRun(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "forge", databaseFilename)
+	session, err := OpenForCreation(context.Background(), path, os.Geteuid())
+	if err != nil {
+		t.Fatalf("OpenForCreation() error = %v", err)
+	}
+	t.Cleanup(func() { session.Close() })
+
+	state, err := InspectSchema(context.Background(), session.Database())
+	if err != nil {
+		t.Fatalf("InspectSchema() error = %v", err)
+	}
+	if state.Version != LatestSchemaVersion || state.NeedsMigration {
+		t.Errorf("schema state = %+v, want current", state)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("database file state error = %v", err)
+	}
+}
+
+func TestOpenForCreationMigratesExistingEmptyDatabase(t *testing.T) {
+	path := createEmptyTestDatabase(t)
+	session, err := OpenForCreation(context.Background(), path, os.Geteuid())
+	if err != nil {
+		t.Fatalf("OpenForCreation() error = %v", err)
+	}
+	t.Cleanup(func() { session.Close() })
+	state, err := InspectSchema(context.Background(), session.Database())
+	if err != nil {
+		t.Fatalf("InspectSchema() error = %v", err)
+	}
+	if state.Version != LatestSchemaVersion || state.NeedsMigration {
+		t.Errorf("schema state = %+v, want current", state)
+	}
+}
+
+func TestOpenForCreationReusesCurrentDatabase(t *testing.T) {
+	path := createCurrentTestDatabase(t)
+	modifyTestDatabase(t, path, func(t *testing.T, session *Session) {
+		t.Helper()
+		if _, err := session.Database().Exec(`CREATE TABLE preserved (value TEXT)`); err != nil {
+			t.Fatalf("create preserved table error = %v", err)
+		}
+		if _, err := session.Database().Exec(`INSERT INTO preserved(value) VALUES ('kept')`); err != nil {
+			t.Fatalf("insert preserved value error = %v", err)
+		}
+	})
+
+	session, err := OpenForCreation(context.Background(), path, os.Geteuid())
+	if err != nil {
+		t.Fatalf("OpenForCreation() error = %v", err)
+	}
+	t.Cleanup(func() { session.Close() })
+	var value string
+	if err := session.Database().QueryRow(`SELECT value FROM preserved`).Scan(&value); err != nil {
+		t.Fatalf("read preserved value error = %v", err)
+	}
+	if value != "kept" {
+		t.Errorf("preserved value = %q, want kept", value)
+	}
+}
+
+func TestOpenForCreationRejectsNewerSchema(t *testing.T) {
+	path := createCurrentTestDatabase(t)
+	modifyTestDatabase(t, path, func(t *testing.T, session *Session) {
+		t.Helper()
+		if _, err := session.Database().Exec(
+			`INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, ?, ?)`,
+			LatestSchemaVersion+1,
+			"future.sql",
+			"2026-08-25T00:00:00.000Z",
+		); err != nil {
+			t.Fatalf("insert future migration error = %v", err)
+		}
+	})
+
+	session, err := OpenForCreation(context.Background(), path, os.Geteuid())
+	if session != nil {
+		session.Close()
+		t.Fatalf("OpenForCreation() returned a session, want nil")
+	}
+	if err == nil || !strings.Contains(err.Error(), "newer than supported") {
+		t.Fatalf("OpenForCreation() error = %v, want newer-schema error", err)
+	}
+}
+
+func TestOpenForCreationRejectsInvalidPathBeforeFilesystemAccess(t *testing.T) {
+	root := t.TempDir()
+	wrongNamePath := filepath.Join(root, "missing", "other.db")
+	tests := []struct {
+		name    string
+		path    string
+		wantErr string
+	}{
+		{name: "relative", path: "forge/forge.db", wantErr: "database path must be absolute"},
+		{name: "wrong filename", path: wrongNamePath, wantErr: "database path must end with forge.db"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			session, err := OpenForCreation(context.Background(), tt.path, os.Geteuid())
+			if session != nil {
+				session.Close()
+				t.Fatalf("OpenForCreation() returned a session, want nil")
+			}
+			if err == nil || err.Error() != tt.wantErr {
+				t.Fatalf("OpenForCreation() error = %v, want %q", err, tt.wantErr)
+			}
+		})
+	}
+	if _, err := os.Stat(filepath.Dir(wrongNamePath)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("wrong-name directory state error = %v, want not exist", err)
+	}
+}
+
+func TestOpenForCreationRestrictsExistingStorage(t *testing.T) {
+	path := createCurrentTestDatabase(t)
+	if err := os.Chmod(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("chmod data directory error = %v", err)
+	}
+	if err := os.Chmod(path, 0o666); err != nil {
+		t.Fatalf("chmod database file error = %v", err)
+	}
+
+	session, err := OpenForCreation(context.Background(), path, os.Geteuid())
+	if err != nil {
+		t.Fatalf("OpenForCreation() error = %v", err)
+	}
+	t.Cleanup(func() { session.Close() })
+	directoryInfo, err := os.Stat(filepath.Dir(path))
+	if err != nil {
+		t.Fatalf("stat data directory error = %v", err)
+	}
+	databaseInfo, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat database file error = %v", err)
+	}
+	if directoryInfo.Mode().Perm() != 0o700 || databaseInfo.Mode().Perm() != 0o600 {
+		t.Errorf("storage modes = %04o/%04o, want 0700/0600", directoryInfo.Mode().Perm(), databaseInfo.Mode().Perm())
+	}
+}
+
 func TestOpenExistingReadWriteSession(t *testing.T) {
 	path := createCurrentTestDatabase(t)
 	session, err := OpenExisting(context.Background(), path, os.Geteuid(), DatabaseReadWrite)
