@@ -15,6 +15,7 @@ import (
 	"github.com/damienomurchu/forge-cli/internal/config"
 	"github.com/damienomurchu/forge-cli/internal/domain"
 	"github.com/damienomurchu/forge-cli/internal/output"
+	promptui "github.com/damienomurchu/forge-cli/internal/prompt"
 	"github.com/damienomurchu/forge-cli/internal/repository"
 	"github.com/damienomurchu/forge-cli/internal/storage"
 )
@@ -41,14 +42,14 @@ Flags:
 const captureHelp = `Capture a thought, idea, or observation.
 
 Usage:
-  forge capture --quick [--project PROJECT] [--kind KIND]
+  forge capture [--quick] [--project PROJECT] [--kind KIND]
                 [--tags TAGS] [--json] DESCRIPTION
 
 Flags:
   -h, --help             Show help
-      --kind KIND        Set capture kind (default: thought)
+      --kind KIND        Set capture kind (required without --quick)
       --project PROJECT  Associate the capture with a project
-      --quick            Capture without prompting (currently required)
+      --quick            Capture without confirmation
       --tags TAGS        Add comma-separated tags
       --json             Write the created record as JSON
 `
@@ -143,8 +144,17 @@ type Runtime struct {
 	Now    func() time.Time
 	Random io.Reader
 	IsTTY  func() bool
+	Prompt func() Prompt
 	GOOS   string
 	EUID   int
+}
+
+// Prompt is the interactive boundary used after parsing, validation, and TTY
+// detection. Implementations must route rendering away from command stdout.
+type Prompt interface {
+	Select(context.Context, string, []string, string) (string, error)
+	Text(context.Context, string) (string, error)
+	Confirm(context.Context, string, bool) (bool, error)
 }
 
 // UsageError reports an invalid command line.
@@ -152,6 +162,15 @@ type UsageError struct {
 	Argument string
 	Message  string
 }
+
+// InterruptedError reports a user interruption with command-specific wording.
+type InterruptedError struct {
+	Message string
+	Cause   error
+}
+
+func (e *InterruptedError) Error() string { return e.Message }
+func (e *InterruptedError) Unwrap() error { return e.Cause }
 
 func (e *UsageError) Error() string {
 	if e.Message != "" {
@@ -845,6 +864,28 @@ func runCapture(ctx context.Context, args []string, rt Runtime) error {
 	if err != nil {
 		return fmt.Errorf("create capture: %w", err)
 	}
+	if !options.quick {
+		if rt.IsTTY == nil || !rt.IsTTY() {
+			return &domain.InvalidValueError{Field: "interaction", Value: "stdin is not a terminal"}
+		}
+		if rt.Prompt == nil {
+			return errors.New("capture prompt is not configured")
+		}
+		prompt := rt.Prompt()
+		if prompt == nil {
+			return errors.New("capture prompt is not configured")
+		}
+		confirmed, err := prompt.Confirm(ctx, "Create capture?", true)
+		if err != nil {
+			if errors.Is(err, promptui.ErrCancelled) {
+				return &InterruptedError{Message: "capture cancelled", Cause: err}
+			}
+			return fmt.Errorf("confirm capture: %w", err)
+		}
+		if !confirmed {
+			return nil
+		}
+	}
 
 	databasePath, err := config.ResolveDatabasePath(rt.GOOS, rt.Env)
 	if err != nil {
@@ -898,6 +939,7 @@ type quickCaptureOptions struct {
 	kind        domain.CaptureKind
 	tags        string
 	json        bool
+	quick       bool
 }
 
 func parseQuickCapture(args []string) (quickCaptureOptions, error) {
@@ -905,6 +947,7 @@ func parseQuickCapture(args []string) (quickCaptureOptions, error) {
 	optionsEnded := false
 	positionals := make([]string, 0, 1)
 	kind := domain.CaptureKindThought
+	kindSet := false
 	project := ""
 	tags := ""
 	jsonOutput := false
@@ -927,6 +970,7 @@ func parseQuickCapture(args []string) (quickCaptureOptions, error) {
 				return quickCaptureOptions{}, err
 			}
 			kind = parsed
+			kindSet = true
 		case !optionsEnded && strings.HasPrefix(arg, "--kind="):
 			value := strings.TrimPrefix(arg, "--kind=")
 			if value == "" {
@@ -937,6 +981,7 @@ func parseQuickCapture(args []string) (quickCaptureOptions, error) {
 				return quickCaptureOptions{}, err
 			}
 			kind = parsed
+			kindSet = true
 		case !optionsEnded && arg == "--project":
 			if index+1 >= len(args) || strings.HasPrefix(args[index+1], "-") {
 				return quickCaptureOptions{}, &UsageError{Message: "--project requires a value"}
@@ -965,8 +1010,8 @@ func parseQuickCapture(args []string) (quickCaptureOptions, error) {
 	if len(positionals) > 1 {
 		return quickCaptureOptions{}, &UsageError{Message: fmt.Sprintf("unexpected argument %q", positionals[1])}
 	}
-	if !quick {
-		return quickCaptureOptions{}, &UsageError{Message: "capture currently requires --quick"}
+	if !quick && !kindSet {
+		return quickCaptureOptions{}, &UsageError{Message: "capture requires --kind when --quick is omitted"}
 	}
 	return quickCaptureOptions{
 		description: positionals[0],
@@ -974,11 +1019,17 @@ func parseQuickCapture(args []string) (quickCaptureOptions, error) {
 		kind:        kind,
 		tags:        tags,
 		json:        jsonOutput,
+		quick:       quick,
 	}, nil
 }
 
 // WriteError writes a concise user-facing error and returns its exit status.
 func WriteError(w io.Writer, err error) int {
+	var interrupted *InterruptedError
+	if errors.As(err, &interrupted) {
+		fmt.Fprintf(w, "forge: %s\n", interrupted)
+		return 130
+	}
 	if usageErr, ok := err.(*UsageError); ok {
 		fmt.Fprintf(w, "forge: %s\nTry 'forge --help' for usage.\n", usageErr)
 		return 2

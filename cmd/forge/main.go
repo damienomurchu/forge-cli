@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/damienomurchu/forge-cli/internal/cli"
+	"github.com/damienomurchu/forge-cli/internal/prompt"
 )
 
 var version = "dev"
@@ -21,6 +22,7 @@ func main() {
 		Now:    time.Now,
 		Random: rand.Reader,
 		IsTTY:  stdinIsTerminal,
+		Prompt: func() cli.Prompt { return prompt.New(os.Stdin, os.Stderr) },
 		GOOS:   runtime.GOOS,
 		EUID:   os.Geteuid(),
 	}
