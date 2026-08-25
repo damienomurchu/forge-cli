@@ -117,6 +117,21 @@ Flags:
       --status STATUS  Set the lifecycle status
 `
 
+const reviewHelp = `Review actionable friction.
+
+Usage:
+  forge review [--json]
+
+Includes friction in captured, reviewing, or candidate status.
+
+Output:
+  <id>  <status>  <frequency>  <impact>  <category>  <description>
+
+Flags:
+  -h, --help  Show help
+      --json   Write records as a JSON array
+`
+
 // Runtime contains process facilities used by the CLI. Keeping them explicit
 // makes command behavior deterministic in tests and keeps global process state
 // out of application code.
@@ -168,9 +183,80 @@ func Run(ctx context.Context, args []string, rt Runtime, version string) error {
 		return runShow(ctx, args[1:], rt)
 	case len(args) > 0 && args[0] == "update":
 		return runUpdate(ctx, args[1:], rt)
+	case len(args) > 0 && args[0] == "review":
+		return runReview(ctx, args[1:], rt)
 	default:
 		return &UsageError{Argument: args[0]}
 	}
+}
+
+func runReview(ctx context.Context, args []string, rt Runtime) error {
+	if commandHelpRequested(args) {
+		_, err := io.WriteString(rt.Stdout, reviewHelp)
+		return err
+	}
+	jsonOutput, err := parseReview(args)
+	if err != nil {
+		return err
+	}
+	databasePath, err := config.ResolveDatabasePath(rt.GOOS, rt.Env)
+	if err != nil {
+		return fmt.Errorf("resolve database path: %w", err)
+	}
+	session, err := storage.OpenExisting(ctx, databasePath, rt.EUID, storage.DatabaseReadOnly)
+	if errors.Is(err, storage.ErrStorageNotFound) {
+		if err := writeReviewResult(rt.Stdout, nil, jsonOutput); err != nil {
+			return fmt.Errorf("write review result: %w", err)
+		}
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("open storage for review: %w", err)
+	}
+	repo, err := repository.New(session.Database())
+	if err != nil {
+		return errors.Join(err, session.Close())
+	}
+	records, err := repo.Review(ctx)
+	if err != nil {
+		return errors.Join(err, session.Close())
+	}
+	if err := session.Close(); err != nil {
+		return fmt.Errorf("close storage after review: %w", err)
+	}
+	if err := writeReviewResult(rt.Stdout, records, jsonOutput); err != nil {
+		return fmt.Errorf("write review result: %w", err)
+	}
+	return nil
+}
+
+func parseReview(args []string) (bool, error) {
+	jsonOutput := false
+	for _, arg := range args {
+		if arg != "--json" {
+			return false, &UsageError{Argument: arg}
+		}
+		if jsonOutput {
+			return false, &UsageError{Message: "--json may only be specified once"}
+		}
+		jsonOutput = true
+	}
+	return jsonOutput, nil
+}
+
+func writeReviewResult(w io.Writer, records []domain.Record, jsonOutput bool) error {
+	var rendered bytes.Buffer
+	var err error
+	if jsonOutput {
+		err = output.WriteRecordsJSON(&rendered, records)
+	} else {
+		err = output.WriteReview(&rendered, records)
+	}
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(w, &rendered)
+	return err
 }
 
 type updateCommandOptions struct {

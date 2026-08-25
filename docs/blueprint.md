@@ -372,6 +372,9 @@ Current implementation status:
   validation, complete terminal-safe human output, and complete record JSON.
   Update changes lifecycle status atomically against existing storage, preserves
   timestamps on true no-ops, and returns concise human or complete JSON results.
+  Review is implemented as a strictly read-only, repository-filtered view of
+  actionable friction with a concise terminal-safe human layout and complete JSON
+  arrays. This completes Phase 5's non-interactive command surface.
 - Phases 6 through 8 remain planned and unimplemented.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.

@@ -2,11 +2,59 @@ package output
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"strings"
 
 	"github.com/damienomurchu/forge-cli/internal/domain"
 )
+
+const emptyReview = "No actionable friction.\n"
+
+// WriteReview writes actionable friction in a compact terminal-safe layout.
+// Every record is validated before any output is written.
+func WriteReview(w io.Writer, records []domain.Record) error {
+	for _, record := range records {
+		if err := record.Validate(); err != nil {
+			return err
+		}
+		if record.Type != domain.RecordTypeFriction || !actionableReviewStatus(record.Status) {
+			return fmt.Errorf("record %q is not actionable friction", record.ID.String())
+		}
+	}
+
+	if len(records) == 0 {
+		_, err := io.WriteString(w, emptyReview)
+		return err
+	}
+
+	var rendered bytes.Buffer
+	for _, record := range records {
+		rendered.WriteString(EscapeText(record.ID.String()))
+		rendered.WriteString("  ")
+		rendered.WriteString(record.Status.String())
+		rendered.WriteString("  ")
+		rendered.WriteString(record.Details.Friction.Frequency.String())
+		rendered.WriteString("  ")
+		rendered.WriteString(record.Details.Friction.Impact.String())
+		rendered.WriteString("  ")
+		rendered.WriteString(record.Details.Friction.Category.String())
+		rendered.WriteString("  ")
+		rendered.WriteString(EscapeText(record.Description))
+		rendered.WriteByte('\n')
+	}
+	_, err := io.Copy(w, &rendered)
+	return err
+}
+
+func actionableReviewStatus(status domain.Status) bool {
+	switch status {
+	case domain.StatusCaptured, domain.StatusReviewing, domain.StatusCandidate:
+		return true
+	default:
+		return false
+	}
+}
 
 // WriteRecord writes a complete terminal-safe human representation of one
 // record. Validation completes before any output is written.

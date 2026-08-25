@@ -38,6 +38,73 @@ func TestWriteCreatedMatchesGolden(t *testing.T) {
 	}
 }
 
+func TestWriteReviewMatchesGolden(t *testing.T) {
+	want, err := os.ReadFile(filepath.Join("testdata", "review.golden"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	newer := frictionRecord(t)
+	newer.Status = domain.StatusCandidate
+	newer.Description = "line one\nline two\u202e"
+	older := frictionRecord(t)
+	older.ID = "frc_00000000000000000000000000000000"
+	older.Status = domain.StatusCaptured
+	older.Details.Friction.Impact = domain.ImpactLow
+	older.Details.Friction.Frequency = domain.FrequencyDaily
+	older.Details.Friction.Category = domain.CategoryWaiting
+	older.Description = "Wait for CI"
+
+	var got bytes.Buffer
+	if err := WriteReview(&got, []domain.Record{newer, older}); err != nil {
+		t.Fatalf("WriteReview() error = %v", err)
+	}
+	if got.String() != string(want) {
+		t.Errorf("WriteReview() = %q, want %q", got.String(), want)
+	}
+}
+
+func TestWriteReviewEmptyMatchesGolden(t *testing.T) {
+	want, err := os.ReadFile(filepath.Join("testdata", "review-empty.golden"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got bytes.Buffer
+	if err := WriteReview(&got, nil); err != nil {
+		t.Fatalf("WriteReview() error = %v", err)
+	}
+	if got.String() != string(want) {
+		t.Errorf("WriteReview() = %q, want %q", got.String(), want)
+	}
+}
+
+func TestWriteReviewRejectsInvalidOrExcludedRecordsBeforeWriting(t *testing.T) {
+	invalid := frictionRecord(t)
+	invalid.Status = "invalid"
+	excluded := frictionRecord(t)
+	excluded.Status = domain.StatusAutomated
+	capture := captureRecord(t)
+	for _, record := range []domain.Record{invalid, excluded, capture} {
+		var got bytes.Buffer
+		err := WriteReview(&got, []domain.Record{frictionRecord(t), record})
+		if err == nil {
+			t.Fatal("WriteReview() error = nil, want validation error")
+		}
+		if got.Len() != 0 {
+			t.Errorf("WriteReview() wrote %q before validation failed", got.String())
+		}
+	}
+}
+
+func TestWriteReviewPropagatesWriterFailure(t *testing.T) {
+	wantErr := errors.New("writer failed")
+	if err := WriteReview(errorWriter{err: wantErr}, []domain.Record{frictionRecord(t)}); !errors.Is(err, wantErr) {
+		t.Fatalf("WriteReview() error = %v, want %v", err, wantErr)
+	}
+	if err := WriteReview(errorWriter{err: wantErr}, nil); !errors.Is(err, wantErr) {
+		t.Fatalf("empty WriteReview() error = %v, want %v", err, wantErr)
+	}
+}
+
 func TestWriteRecordMatchesGolden(t *testing.T) {
 	tests := []struct {
 		name   string
