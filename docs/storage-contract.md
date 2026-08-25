@@ -193,6 +193,11 @@ Transactional friction insertion is implemented: all shared and friction-specifi
 values commit in one record row, capture-only values remain null, no tags are
 created, and any failure rolls back the operation.
 
+Read-only lookup by ID is implemented for both record types. It reconstructs the
+domain record, loads capture tags by ascending position, distinguishes missing
+records from operational failures, and rejects malformed stored values or tag
+positions.
+
 ## Initialization and read-only commands
 
 Only commands that create records may create the data directory, database, or

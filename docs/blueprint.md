@@ -340,7 +340,7 @@ Current implementation status:
   and secure data-directory and database-file opening are implemented. SQLite
   connection setup with required pragmas is implemented; transactional migrations
   and transactional capture and friction insertion are also implemented.
-  Repository reads and updates are next.
+  Repository lookup by record ID is implemented; listing and updates are next.
 - Phases 5 through 8 remain planned and unimplemented.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.
