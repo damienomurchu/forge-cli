@@ -1,69 +1,68 @@
-# Forge CLI: Go Rewrite Blueprint
+# Forge CLI: Go Implementation Blueprint
 
 ## Purpose
 
-Rewrite Forge in Go to reduce command latency while preserving the behavior, data,
-security properties, and release experience of Forge 2.1.0.
+Build Forge as a fast, native Go command-line application for capturing ideas and
+friction in day-to-day work. The command design and user workflow are the product;
+the implementation should be small, direct, secure, and easy to evolve.
 
-This is an implementation rewrite, not a product redesign. The Go executable must
-be a drop-in replacement for the Python executable and must operate safely on the
-same SQLite database. New features, schema changes, and output redesigns are out of
-scope until parity is complete.
+An earlier Python implementation reached version 2.1.0 and is now archived. It is
+useful as historical context for the concepts behind Forge, but it is not a
+behavioral specification, compatibility oracle, test dependency, or release target.
+The Go project may deliberately improve commands, output, errors, storage, and
+interaction design.
 
-The rewrite should optimize this loop:
+## Goals
 
-```text
-invoke command -> parse only what is needed -> open data only when needed
-               -> perform one operation -> write output -> exit
-```
+1. Make common commands feel immediate.
+2. Preserve the useful product concepts: captures, friction, projects, tags,
+   classification, review, and lifecycle status.
+3. Define Go behavior explicitly through this document and tests.
+4. Keep local data durable, private, inspectable, and easy to back up.
+5. Produce native Linux AMD64 and macOS ARM64 executables without a runtime.
+6. Keep the codebase small, explicit, and testable.
 
-## Primary goals
+Initial performance budgets are warm wall-clock medians over at least 30 runs:
 
-1. Preserve the current command-line and storage contracts.
-2. Reduce warm `--version` and `--help` latency from roughly 240 ms to at most 30 ms.
-3. Keep warm database-backed commands under 50 ms for a small local database.
-4. Produce native Linux AMD64 and macOS ARM64 executables without requiring a
-   Python runtime.
-5. Keep the codebase small, explicit, testable, and easy for an AI agent to modify.
-6. Replace the Python implementation only after automated parity checks pass.
+- `forge --version` and `forge --help`: at most 30 ms
+- commands against a small local database: at most 50 ms
 
-Latency targets are measured wall-clock medians over at least 30 warm invocations on
-an otherwise idle machine. They are budgets, not permission to weaken validation,
-durability, or filesystem security.
+These are targets, not permission to weaken validation, durability, or security.
 
 ## Non-goals
 
-- Changing commands, flags, defaults, exit codes, or stored values.
-- Changing the existing database schema during the parity phase.
-- Importing Python code or invoking Python from Go.
+- Reproducing Python 2.1.0 byte-for-byte or quirk-for-quirk.
+- Maintaining cross-implementation golden tests.
+- Keeping old output, prompts, errors, JSON, or exit codes merely because the
+  archived implementation used them.
+- Importing or invoking Python from Go.
 - Adding a daemon solely to hide startup time.
-- Adding a web UI, API, synchronization, plugins, AI features, or configuration
-  framework.
-- Introducing an ORM, dependency-injection framework, or general command framework.
-- Supporting downgrade from a database migrated by a future Forge release.
+- Adding a web UI, synchronization, plugins, AI features, or a configuration
+  framework during the initial implementation.
+- Introducing an ORM, dependency-injection framework, or broad CLI framework
+  without demonstrated need.
 - Optimizing hypothetical workloads before measuring them.
 
-## Sources of truth and conflict resolution
+## Sources of truth
 
-Use these sources in this order:
+Use these sources in order:
 
-1. Tests that encode released Forge 2.1.0 behavior.
-2. The command and compatibility contracts in this document.
-3. `docs/blueprint.md` and `README.md`.
-4. The existing Python implementation.
+1. The current product and command decisions in this document.
+2. Tests encoding approved Go behavior.
+3. Current user-facing documentation.
+4. The archived Python implementation, as historical context only.
 
-If these disagree, stop and record the discrepancy before changing behavior. Do not
-silently choose the easiest implementation. A compatibility fixture may preserve a
-released quirk even when a cleaner design is possible.
+When Python differs, do not assume either behavior is correct. Choose the clearest
+design for the Go product, document material decisions, and add focused tests.
+Historical behavior becomes a requirement only when explicitly adopted here.
 
-## Confirmed compatibility contract
+## Initial command design
 
-### Command surface
+This is the starting design, not a frozen compatibility contract:
 
 ```text
 forge
 forge --help
-forge -h
 forge --version
 
 forge capture [--quick] [--project PROJECT] [--kind KIND] [--tags TAGS]
@@ -80,11 +79,11 @@ forge update RECORD_ID --status STATUS
 forge review [friction] [--json]
 ```
 
-`forge capture list` and `forge friction list` are reserved typed-list commands. To
-capture the literal description `list`, the user writes `forge capture -- list` or
-`forge friction -- list`.
+Before implementing each command group, confirm that its names, flags, defaults,
+and interaction model express the intended workflow. Improve them deliberately
+rather than inheriting historical details accidentally.
 
-### Values
+### Initial vocabulary
 
 ```text
 record types: capture, friction
@@ -96,85 +95,60 @@ categories: information-finding, repeated-action, context-switching, remembering
             verification, waiting, other
 ```
 
-Enum spellings are storage and integration contracts.
+This is a starting vocabulary. Once exposed through persistent data or a
+machine-readable interface, changes require an explicit compatibility decision.
 
-### Input behavior
+## Intended behavior
 
-- Descriptions must contain non-whitespace text. Trim surrounding whitespace but
+### Input
+
+- Descriptions contain non-whitespace text. Trim surrounding whitespace and
   preserve internal whitespace.
-- Optional text values become absent when empty after trimming.
-- Tags are split on commas, trimmed, lowercased, deduplicated, and stored in
+- Optional text becomes absent when empty after trimming.
+- Tags are comma-separated, trimmed, lowercased, deduplicated, and retain
   first-seen order.
-- `--quick` skips prompts and supplies defaults only for omitted fields.
-- Explicit flags always override quick-mode defaults.
-- Outside quick mode, prompt only for missing required classification values and
-  then ask for confirmation.
-- If prompting is required and stdin is not an interactive terminal, fail
-  immediately with a usage error.
-- Declining confirmation exits successfully and writes nothing.
-- Ctrl-C during prompting prints cancellation to stderr, writes nothing, and exits
-  130.
-- Do not create the data directory for help, version, or usage errors.
+- `--quick` avoids prompts and supplies defaults for omitted classification fields.
+- Explicit flags override defaults.
+- Prompt only when useful information is missing and stdin is a terminal.
+- Declining confirmation or cancelling writes nothing.
+- Cancellation restores terminal state.
+- Help, version, and argument errors do not create a data directory.
 
-Quick defaults:
+Initial quick defaults:
 
 ```text
 capture kind: thought
 friction frequency: unknown
 friction impact: unknown
 friction category: other
-optional fields: absent/empty
 status: captured
 ```
 
-### Query behavior
+### Queries
 
 - List filters compose with AND semantics.
-- `--limit` must be a positive integer.
-- Results are ordered by `created_at DESC, id DESC`.
-- Review includes friction in `captured`, `reviewing`, and `candidate` status.
-- Review excludes `automated` and `dismissed` records.
+- Limits are positive integers.
+- Newest records appear first, with deterministic tie-breaking.
+- Review initially includes friction in `captured`, `reviewing`, and `candidate`.
 - Review is read-only.
-- Status updates validate the new status but do not enforce a transition graph.
-- A missing record is a command failure, not an empty success.
+- Updating a missing record is an error.
 
-### Output and exit behavior
+### Output and errors
 
-```text
-0   success, including declined confirmation
-1   operational, validation, stored-data, or not-found failure
-2   command-line usage error
-130 user cancellation via Ctrl-C
-```
+- Human output is concise and machine output is valid, stable JSON.
+- JSON mode emits no additional human success text on stdout.
+- Lists and review emit arrays, including `[]` when empty.
+- Human output visibly escapes terminal controls and bidirectional controls.
+- Normal errors are concise and never include stack traces.
+- Exit-code categories and JSON schemas must be designed and tested before being
+  declared stable public interfaces.
 
-- Human output goes to stdout.
-- Concise errors and cancellation notices go to stderr.
-- JSON mode emits no human success text.
-- Capture, friction, and show emit one JSON object.
-- List and review emit one JSON array, including `[]` for no results.
-- JSON field names and value types must remain compatible with Forge 2.1.0.
-- Human output visibly escapes C0/C1 terminal controls, newlines, carriage returns,
-  tabs, and Unicode bidirectional controls.
-- JSON output preserves stored content using valid JSON escaping.
-- Never print stack traces during normal command failures.
+## Storage design
 
-Golden tests must capture exact help, success, empty-result, error, human-record, and
-JSON output before the Python implementation is removed.
+Use SQLite for local persistence. The initial Go schema may reuse good ideas from
+the archived project, but it belongs to this project and should support its future.
 
-## Existing storage contract
-
-Forge continues to use the existing SQLite database without export or conversion.
-
-Default locations:
-
-```text
-Linux: $XDG_DATA_HOME/forge/forge.db
-       falling back to ~/.local/share/forge/forge.db
-macOS: ~/Library/Application Support/forge/forge.db
-override: $FORGE_DATA_DIR/forge.db
-```
-
-Schema:
+Proposed starting point:
 
 ```sql
 CREATE TABLE records (
@@ -187,177 +161,68 @@ CREATE TABLE records (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
-
-CREATE INDEX idx_records_type ON records(type);
-CREATE INDEX idx_records_status ON records(status);
-CREATE INDEX idx_records_project ON records(project);
-CREATE INDEX idx_records_created_at ON records(created_at);
 ```
 
-The existing `schema_migrations` table and `001_initial.sql` migration name must be
-recognized. Do not rename, reapply, or replace them.
+Before committing migration 001, decide whether typed columns or structured
+metadata are the better long-term model. After release, migrations are append-only
+and existing Go-created databases remain supported.
 
-Capture metadata:
-
-```json
-{"kind":"thought","tags":["forge","dashboard"]}
-```
-
-Friction metadata:
-
-```json
-{
-  "frequency":"weekly",
-  "impact":"medium",
-  "category":"information-finding",
-  "current_workaround":"Search repositories manually"
-}
-```
-
-Timestamps are UTC RFC 3339 strings with six fractional digits and a `Z` suffix,
-for example `2026-08-24T20:34:11.123456Z`. Preserve this exact format rather than
-using Go's default `time.RFC3339Nano` formatting.
-
-IDs retain the current shape:
+Default locations:
 
 ```text
-ca-YYYYMMDD-HHMMSS-microseconds-6hex
-fr-YYYYMMDD-HHMMSS-microseconds-6hex
+Linux: $XDG_DATA_HOME/forge/forge.db
+       falling back to ~/.local/share/forge/forge.db
+macOS: ~/Library/Application Support/forge/forge.db
+override: $FORGE_DATA_DIR/forge.db
 ```
 
-Generate the suffix with a cryptographically secure random source. If randomness
-fails, return an error; do not silently substitute predictable data.
+Importing an archived Python database is optional future work. If needed, implement
+an explicit, tested import or migration path; do not constrain the core model
+silently for compatibility.
 
-### Filesystem security invariants
+### Filesystem security
 
-- Resolve the data directory centrally.
-- Create it lazily with mode `0700`.
-- Require it to be a real directory owned by the effective user.
-- Reject a symbolic link at the data-directory path.
-- Require the database to be a regular file owned by the effective user.
-- Reject a symbolic link at the database path.
-- Create or correct the database mode to `0600`.
-- Use no-follow/open-and-inspect facilities where the operating system supports
-  them; avoid check-then-open races.
-- Never weaken these checks merely to meet a latency target.
-- Keep platform-specific filesystem operations behind a small internal interface so
-  Linux, macOS, and test implementations can differ explicitly.
+- Resolve the data directory centrally and create it lazily with mode `0700`.
+- Require the directory and database to be owned by the effective user.
+- Reject symbolic links at data-directory and database paths.
+- Require a regular database file and create or correct mode `0600`.
+- Use no-follow/open-and-inspect facilities where supported to avoid races.
+- Keep platform operations behind a small internal boundary.
+- Never weaken these rules to meet a latency budget.
 
 ## Go technology decisions
 
-### Toolchain
+- Use and pin the newest stable Go release supported by CI.
+- Prefer the standard library and custom command dispatch.
+- Use `crypto/rand`, `encoding/json`, and `time` for standard concerns.
+- Evaluate SQLite drivers with a focused spike before selecting one.
+- Keep prompt dependencies behind a small interface and out of non-interactive
+  startup paths.
+- Record each dependency's purpose, version, alternatives, startup cost, and binary
+  size impact.
 
-- Use the newest stable Go release supported by CI when the rewrite begins.
-- Pin the intended toolchain in `go.mod`/the `toolchain` directive and CI.
-- Support the two most recent stable Go release families unless a dependency forces
-  a narrower range.
-- Commit `go.mod` and `go.sum`.
-- Use `gofmt`, `go vet`, and `go test` as the baseline toolchain.
+The SQLite spike must cover native cross-builds, startup, size, CRUD, migrations,
+locking, durability, and maintenance. Pure Go is desirable but not pre-approved.
 
-### Dependencies
-
-Prefer the standard library. Every third-party module must solve a concrete problem,
-be pinned, and be recorded in the dependency decision table below.
-
-Initial candidates:
-
-| Concern | Candidate | Decision gate |
-|---|---|---|
-| SQLite | `modernc.org/sqlite` through `database/sql` | Accept only after cross-build, binary-size, startup, CRUD, migration, and concurrency spikes pass |
-| Interactive prompts | `github.com/charmbracelet/huh` | Keep behind `Prompt` interface; accept only if arrow keys, `j`/`k`, cancellation, streams, and startup budgets pass |
-| CLI parsing | standard library/custom command dispatch | Do not add Cobra unless measured complexity justifies its startup and dependency cost |
-| IDs | `crypto/rand`, `encoding/hex`, `time` | Standard library |
-| JSON | `encoding/json` | Standard library |
-
-The pure-Go SQLite candidate avoids CGO and simplifies Linux/macOS builds. It is not
-pre-approved solely for that reason: its compile time, binary size, cold-start cost,
-SQLite behavior, and transitive dependency set must be measured. If it fails the
-spike, document and compare a CGO driver or another maintained pure-Go driver before
-changing direction.
-
-Do not let prompt dependencies enter non-interactive packages. A non-interactive
-command must not initialize terminal UI state.
-
-## Target repository layout
-
-Keep the Go rewrite alongside the Python implementation until parity is proven:
-
-```text
-.
-├── cmd/
-│   └── forge/
-│       └── main.go
-├── internal/
-│   ├── app/
-│   │   ├── app.go
-│   │   └── commands.go
-│   ├── cli/
-│   │   ├── parse.go
-│   │   ├── help.go
-│   │   └── exit.go
-│   ├── config/
-│   │   └── paths.go
-│   ├── domain/
-│   │   ├── record.go
-│   │   ├── values.go
-│   │   └── normalize.go
-│   ├── prompt/
-│   │   ├── prompt.go
-│   │   └── terminal.go
-│   ├── repository/
-│   │   ├── repository.go
-│   │   ├── sqlite.go
-│   │   └── migrations.go
-│   ├── output/
-│   │   ├── human.go
-│   │   └── json.go
-│   └── platform/
-│       ├── files_unix.go
-│       └── files_test.go
-├── migrations/
-│   └── 001_initial.sql
-├── testdata/
-│   ├── golden/
-│   └── compatibility/
-├── docs/
-│   ├── blueprint.md
-│   └── blueprint-go.md
-├── go.mod
-├── go.sum
-└── Makefile
-```
-
-This is a boundary map, not a demand for tiny files. Merge files when that improves
-clarity; do not merge the domain, repository, prompt, and presentation boundaries.
-
-## Architecture and interfaces
-
-Dependency direction:
+## Architecture
 
 ```text
 main -> cli/app -> domain + prompt + output + repository -> config/platform
 ```
 
-Rules:
+- `main` constructs dependencies, runs the app, and maps errors to an exit code.
+  Do not call `os.Exit` below `main`.
+- Parsing returns typed intent and does not open the database.
+- Domain code validates without SQL or terminal knowledge.
+- Prompt code collects input and never persists records.
+- Repository code owns SQL, migrations, transactions, and decoding.
+- Output code owns human and JSON representations.
+- Inject streams, environment, clock, randomness, terminal detection, and data
+  location through narrow dependencies.
+- Use `context.Context` at application and repository boundaries.
+- Prefer concrete internal types and small interfaces at real seams.
 
-- `main` constructs dependencies, calls one runner, and maps its result to an exit
-  code. Do not call `os.Exit` below `main`, because deferred cleanup and tests must
-  work.
-- CLI parsing identifies intent and returns typed command values. It does not open
-  the database.
-- Domain code validates and normalizes records without SQL or terminal knowledge.
-- Prompt code collects missing values only. It does not persist records.
-- Repository code owns SQL, migrations, transactions, and stored-data decoding.
-- Output code owns stable human and JSON representations.
-- Pass `io.Reader`, `io.Writer`, environment access, clock, random reader, and data
-  location through narrow dependencies so tests do not use global process state.
-- Use `context.Context` at application and repository boundaries; do not store a
-  context in a struct.
-- Prefer concrete types internally and small interfaces at test or boundary seams.
-- Wrap errors with operation context and classify them with sentinel/typed errors
-  for exit-code mapping. Do not branch on error strings.
-
-Suggested central runner:
+Suggested runner:
 
 ```go
 type Runtime struct {
@@ -373,70 +238,34 @@ type Runtime struct {
 func Run(ctx context.Context, args []string, rt Runtime) error
 ```
 
-The actual interfaces may differ, but tests must be able to run the full CLI without
-mutating `os.Args`, the real environment, the user's home directory, or global
-stdin/stdout.
+## Performance design
 
-## Performance architecture
-
-Performance is a first-class acceptance criterion.
-
-- Handle `--version`, `--help`, and no-argument help before constructing database,
-  prompt, or migration dependencies.
-- Parse only the selected command. Do not construct a global graph of every command
-  on each invocation.
-- Embed the version at link time with `-ldflags`, with a deterministic development
-  fallback. Never scan package metadata at runtime.
-- Embed SQL migrations with `//go:embed`; inspect the current schema version before
-  parsing unapplied migrations.
+- Handle help and version before database or prompt construction.
+- Parse only the selected command.
+- Embed the version at link time with a deterministic development fallback.
+- Embed migrations and avoid unnecessary parsing.
 - Open at most one logical database handle per command.
-- Push filtering, ordering, and limiting into SQL.
-- Query review statuses in SQL rather than loading and discarding inactive records.
-- Stream human list output where practical. JSON arrays may buffer if bounded and
-  documented.
-- Do not add caches, background processes, goroutines, or connection pools without
-  evidence that they reduce end-to-end latency.
-- Configure the short-lived SQLite handle deliberately (`SetMaxOpenConns(1)` is a
-  reasonable starting point) and close it before returning.
-- Measure rather than assume that stripping symbols, build flags, or dependency
-  changes improve startup.
+- Push filters, ordering, and limits into SQL.
+- Add no caches, background processes, goroutines, or pools without end-to-end
+  evidence.
+- Measure release binaries, not just package microbenchmarks.
 
-Required benchmark commands:
+Track median, p90, binary size, and peak RSS for representative commands against
+empty, small, and generated large databases. Use a stable host for release results.
 
-```text
-forge --version
-forge --help
-forge capture --quick "benchmark"
-forge capture list --limit 10
-forge show <existing-id>
-forge review --json
-```
+## Storage implementation
 
-Record median, p90, executable size, and peak RSS for release builds. Run benchmarks
-against an empty database, a small normal database, and a generated large database.
-CI may enforce a generous regression ceiling; release evaluation should use a stable
-host because shared CI timing is noisy.
+- Parameterize values and allow-list dynamic SQL fragments.
+- Apply migrations in order inside transactions and record only successful ones.
+- Make initialization idempotent and reject unknown newer migrations.
+- Use a finite busy timeout and make lock failures actionable.
+- Do not tune journal or synchronous modes without durability measurements.
+- Preserve fields an operation does not intentionally update.
+- Test initialization, migrations, round trips, malformed data, filtering,
+  ordering, locking, rollback, permissions, ownership, and symlink rejection using
+  temporary databases only.
 
-## SQLite and migration requirements
-
-- Use parameterized SQL exclusively for values.
-- Allow-list any dynamic SQL fragments such as sort clauses.
-- Apply pending migrations in order inside transactions.
-- Record a migration only after all its statements succeed.
-- Initialization must be idempotent.
-- Detect unknown newer migrations and return a clear compatibility error rather
-  than attempting a downgrade.
-- Preserve the database on every failure path.
-- Set a finite busy timeout suitable for a local CLI and translate lock errors into
-  a concise actionable error.
-- Do not change journal or synchronous modes without durability and compatibility
-  tests.
-- Decode metadata into type-specific structs and reject invalid stored JSON with an
-  error that includes the record ID but not a stack trace.
-- Preserve unknown metadata fields when an operation does not intentionally replace
-  metadata. Status updates must never rewrite metadata.
-
-Repository operations needed for parity:
+Expected repository operations:
 
 ```text
 Create(ctx, record)
@@ -446,13 +275,9 @@ UpdateStatus(ctx, id, status, updatedAt)
 ListFrictionForReview(ctx)
 ```
 
-For list queries, use `EXPLAIN QUERY PLAN` with generated large fixtures before
-adding composite indexes. Index changes require a new migration and therefore occur
-after storage parity unless a measured scaling test justifies them.
-
 ## Interactive prompting
 
-Define and test a small prompt interface before adapting a terminal library:
+Define a small interface before selecting a terminal adapter:
 
 ```go
 type Prompt interface {
@@ -462,82 +287,27 @@ type Prompt interface {
 }
 ```
 
-Requirements:
+- Keep prompt output away from JSON stdout.
+- Distinguish cancellation, EOF, and ordinary failure.
+- Restore terminal state after signals and errors.
+- Open no database before prompts complete and are confirmed.
+- Use fake prompts in app tests and a small pseudo-terminal integration suite.
+- Quick and fully supplied paths must not initialize terminal UI code.
 
-- Up/Down and `j`/`k` navigate select fields; Enter selects.
-- Prompt output must not contaminate JSON stdout; use the same stream behavior as
-  the released CLI and lock it with tests.
-- Cancellation must be distinguishable from EOF and ordinary failure.
-- Signal handling must restore terminal state.
-- Do not open the database until all prompts are complete and confirmed.
-- Supply a fake prompt in application tests.
-- Keep a small pseudo-terminal integration suite for navigation, Ctrl-C, and
-  terminal restoration.
-- Assess accessible/fallback prompt behavior explicitly; do not assume a full-screen
-  terminal renderer works for every terminal.
+## Testing
 
-## Testing strategy
+Tests define the intended Go product, not parity with an archived executable.
 
-### Unit tests
+- Unit-test domain values, normalization, IDs, time, escaping, parsing, errors, and
+  deterministic formatting.
+- Application-test every command's output streams, errors, state changes,
+  cancellation, and read-free behavior.
+- Repository-test real temporary SQLite files; never use a user's data directory.
+- Use goldens selectively for intentionally designed Go help and output. Review
+  changes as product changes and never regenerate them silently.
+- Do not derive fixtures from Python 2.1.0.
 
-Use table-driven tests for:
-
-- every enum and invalid value
-- description/project/workaround normalization
-- tag normalization and stable deduplication
-- timestamp and ID formatting
-- terminal-safe escaping
-- argument parsing, including option order and `--`
-- error classification and exit-code mapping
-- deterministic human and JSON formatting
-
-### Repository tests
-
-Use a temporary real SQLite file, not the user's data directory. Cover:
-
-- fresh initialization and migration idempotency
-- opening the Python-created schema from a fixture
-- Go-created records read by the Python implementation during coexistence
-- Python-created records read and updated by Go
-- metadata round trips and malformed stored records
-- combined filters, deterministic ordering, and positive limits
-- status updates preserving metadata and changing `updated_at`
-- review filtering in SQL
-- duplicate IDs, missing records, lock contention, rollback, and newer-schema errors
-- symlink, ownership where safely testable, regular-file, and permission checks
-
-### Full CLI tests
-
-Call `Run` with in-memory streams and a temporary data directory. Cover every command
-in human and JSON modes, stdout/stderr separation, exit codes, prompt/no-prompt
-selection, cancellation, and the guarantee that read-free commands create no files.
-
-### Golden compatibility tests
-
-Before implementing Go formatting, capture normalized outputs from Forge 2.1.0.
-Normalize only inherently variable fields such as generated IDs, timestamps, and
-temporary paths. Do not normalize whitespace, JSON structure, error prefixes, or
-exit codes.
-
-Maintain a command matrix containing:
-
-- valid minimal and fully flagged invocations
-- every help path and short `-h`
-- every quick default and explicit override
-- empty/whitespace descriptions and option values
-- literal `list` with and without `--`
-- missing TTY, declined confirmation, EOF, and Ctrl-C
-- invalid enum, limit, option, command, and record ID
-- empty and populated list/review results
-- terminal-control and bidi-control content
-- corrupted metadata and unavailable/unsafe data paths
-
-Run the same cases against the Python and Go executables during coexistence and diff
-exit code, stdout, stderr, and resulting database state.
-
-### Quality and safety checks
-
-Required local/CI checks:
+Required checks:
 
 ```bash
 gofmt -w <changed-go-files>
@@ -547,230 +317,128 @@ go test -race ./...
 go test -cover ./...
 ```
 
-Also add dependency vulnerability scanning using the official Go vulnerability tool
-and retain completion validation and standalone smoke tests. Pin CI actions and
-module versions according to repository policy.
+Add vulnerability scanning when dependencies exist and cross-build checks when
+platform code or dependencies are introduced.
 
 ## Release design
 
-- Build with `CGO_ENABLED=0` if the selected SQLite driver supports the required
-  behavior; verify this rather than assuming it.
-- Produce Linux AMD64 and macOS ARM64 artifacts first, matching existing support.
-- Inject the release version at link time.
-- Use reproducible build flags where practical and document any non-reproducible
-  inputs.
-- Package the executable with the existing Bash, Zsh, and Fish completions.
-- Retain checksums, GitHub build-provenance attestations, tag/version validation, and
-  smoke tests.
-- Add a smoke test that opens a database created by Forge 2.1.0.
-- Do not overwrite or delete the Python release artifacts during development.
+- Build Linux AMD64 and macOS ARM64 artifacts first.
+- Prefer `CGO_ENABLED=0` only if the storage driver passes all requirements.
+- Inject the version at link time and use reproducible flags where practical.
+- Package Bash, Zsh, and Fish completions.
+- Publish checksums, provenance, tag validation, and smoke tests.
+- Install the executable as `forge`.
 
-The installed executable remains named `forge`; users should not need a data
-migration or command change when upgrading.
+The archived Python release process and artifacts are not part of this release.
 
 ## Sequential implementation plan
 
-Each phase is independently reviewable. An AI agent must complete and verify one
-phase before starting the next unless explicitly told to continue.
+Complete and verify one phase before starting the next unless explicitly asked to
+continue.
 
-### Phase 0: Freeze compatibility fixtures
+### Phase 0: Product specification
 
-- Inventory current commands, tests, output, exit codes, database schema, migration
-  records, archive contents, and completion files.
-- Create the golden command matrix and Python-generated database fixtures.
-- Add a benchmark script that reports median and p90 without modifying real data.
+- Confirm the command surface, terminology, defaults, output principles, exit-code
+  categories, and JSON stability policy.
+- Decide between metadata JSON and typed columns before migration 001.
+- Establish reproducible performance measurement using no user data.
 
-Acceptance criteria:
+Acceptance: open decisions are explicit, intended behavior is testable, and no step
+depends on running Python.
 
-- The current Python suite remains green.
-- Fixtures contain no private user data.
-- Variable output normalization is narrow and documented.
-- Baseline latency and artifact size are recorded.
+### Phase 1: Risk spikes
 
-### Phase 1: Spike risky dependencies
+- Evaluate SQLite and interactive prompt options outside production packages.
+- Measure cross-builds, startup, size, CRUD, concurrency, cancellation, and terminal
+  cleanup as applicable.
+- Record decisions and remove spike-only code.
 
-- Build minimal SQLite and prompt experiments outside production packages.
-- Verify cross-compilation, startup latency, artifact size, schema compatibility,
-  cancellation, and terminal cleanup.
-- Record accepted versions and reasons in this document or an ADR.
-- Remove spike-only code after decisions are made.
+### Phase 2: Fast CLI shell
 
-Acceptance criteria:
-
-- SQLite can read and write a copied Forge 2.1.0 database.
-- Linux AMD64 and macOS ARM64 release builds are feasible.
-- The selected dependencies fit the startup and security budgets.
-
-### Phase 2: Establish the Go executable and fast CLI shell
-
-- Add the module, `cmd/forge`, runtime abstraction, exit handling, version injection,
+- Add the module, `cmd/forge`, runtime, exit handling, version injection,
   no-argument help, `--help`, and `--version`.
-- Do not add database code yet.
+- Add no database or prompt code.
+- Verify intentional goldens, no filesystem writes, and the 30 ms budget.
 
-Acceptance criteria:
+### Phase 3: Domain and presentation
 
-- Help/version output and exit codes match golden fixtures.
-- Help/version do not create the data directory.
-- Release-build median help/version latency is at most 30 ms on the benchmark host.
+- Implement approved values, validation, normalization, IDs, timestamps,
+  terminal-safe output, and JSON schemas.
+- Make clock and randomness failures testable.
 
-### Phase 3: Domain values, validation, IDs, and output
+### Phase 4: Secure storage
 
-- Implement typed values, record validation, normalization, exact timestamps/IDs,
-  terminal-safe output, and canonical JSON.
-
-Acceptance criteria:
-
-- Table-driven unit tests cover valid and invalid boundaries.
-- Golden record output matches after allowed ID/time normalization.
-- Randomness and clock failures are testable.
-
-### Phase 4: Secure paths, SQLite, and migrations
-
-- Implement central path resolution, secure file opening, the driver adapter,
-  migrations, and repository operations.
-
-Acceptance criteria:
-
-- Go opens and preserves Python-created databases.
-- Python can read records created by Go.
-- Security and migration failure tests pass without damaging fixtures.
-- One command uses at most one logical database handle.
+- Commit the first Go-owned schema.
+- Implement paths, secure file handling, SQLite, migrations, and repositories.
+- Verify failure safety and at most one logical handle per command.
 
 ### Phase 5: Non-interactive commands
 
-Implement in this order:
+Build small vertical slices in the order that best delivers a useful workflow.
+Each slice covers human output, JSON where supported, errors, database state, and
+latency. Capture-first may be more useful than repository-operation order.
 
-1. `show`
-2. typed lists
-3. `update`
-4. `review`
-5. quick/fully flagged `capture`
-6. quick/fully flagged `friction`
+### Phase 6: Interactive workflows
 
-Acceptance criteria:
-
-- Each command passes its human, JSON, error, and database-state parity cases.
-- Review filtering occurs in SQL.
-- A small warm database command has median latency at most 50 ms on the benchmark
-  host.
-
-### Phase 6: Interactive capture and friction
-
-- Add the prompt adapter only after non-interactive paths are stable.
+- Add prompting after non-interactive behavior is stable.
 - Converge prompted and flag-driven inputs on the same domain functions.
+- Test confirmation, cancellation, EOF, non-TTY behavior, and restoration.
 
-Acceptance criteria:
+### Phase 7: Packaging and release
 
-- Missing fields, confirmation, cancellation, EOF, non-TTY failure, and terminal
-  restoration match the contract.
-- No database file is opened before confirmation.
-- Quick and fully supplied flag paths do not initialize terminal UI dependencies.
+- Add target builds, completions, checksums, provenance, smoke tests, and benchmark
+  reporting.
+- Validate archives on Linux AMD64 and macOS ARM64.
 
-### Phase 7: Packaging and end-to-end parity
+### Phase 8: Product hardening
 
-- Replace PyInstaller release jobs with Go builds while retaining artifact layout,
-  completions, checksums, attestations, and smoke coverage.
-- Run the full cross-implementation compatibility matrix.
+- Review actual usage, simplify rough edges, stabilize intended public interfaces,
+  and document future Go migration policy.
+- Consider an explicit Python database importer only if users need it.
 
-Acceptance criteria:
+## Agent protocol
 
-- Both target artifacts pass smoke and compatibility tests.
-- Release archives contain the expected paths.
-- Version/tag checks work.
-- Latency, binary size, and RSS results are documented.
+For each implementation task:
 
-### Phase 8: Cutover and cleanup
+1. Read this blueprint and inspect the repository and worktree.
+2. Preserve unrelated user changes.
+3. State the single phase and coherent slice.
+4. Identify product decisions, security invariants, and latency budgets affected.
+5. Make the smallest coherent change without opportunistic refactors.
+6. Add tests before claiming completion.
+7. Run targeted and relevant full checks.
+8. Benchmark startup, parsing, dependency, storage, or packaging changes.
+9. Report commands, results, risks, and changed files.
+10. Stop at the phase boundary unless asked to continue.
 
-- Make Go the default development and release implementation.
-- Remove Python code, packaging, lock files, and Python-only CI only after a tagged Go
-  release candidate passes all parity gates.
-- Preserve useful language-independent fixtures and documentation.
-
-Acceptance criteria:
-
-- No documented command requires Python.
-- Existing databases open without conversion or backup restoration.
-- The repository has one authoritative implementation.
-- Rollback consists of reinstalling the prior binary, not reversing a schema change.
-
-## AI agent working protocol
-
-For every task, the agent must:
-
-1. Read this blueprint and inspect the current repository state.
-2. Check for uncommitted user changes and preserve them.
-3. State the single phase/slice being implemented and the files expected to change.
-4. Identify the compatibility cases and latency budget affected.
-5. Make the smallest coherent change; avoid opportunistic refactors.
-6. Add or update tests before claiming completion.
-7. Run targeted tests, then the relevant full checks.
-8. Benchmark when startup, parsing, dependencies, SQLite opening, or packaging changed.
-9. Report exact commands run, results, remaining risks, and files changed.
-10. Stop at the phase boundary unless the user explicitly requests continued work.
-
-The agent must not:
-
-- delete or overwrite the Python implementation before Phase 8
-- read or mutate the user's real Forge database in tests or benchmarks
-- change schema, JSON, human output, enum spelling, IDs, timestamps, exit codes, or
-  defaults without an explicit compatibility decision
-- use global process state where dependency injection makes deterministic tests easy
-- add a dependency without documenting why the standard library is insufficient and
-  measuring its startup/artifact impact
-- weaken path ownership, symlink, permissions, transaction, or terminal-safety rules
-- claim performance improvement from microbenchmarks alone
-- combine a behavior change, storage migration, dependency replacement, and release
-  rewrite in one review slice
-- silently regenerate golden fixtures to make a failing test pass
-
-When ambiguity remains, the agent should preserve released behavior, add a focused
-test that exposes the ambiguity, and ask for a decision only if implementation cannot
-proceed safely.
-
-## Pull-request checklist
-
-- [ ] Scope names one blueprint phase and one coherent slice.
-- [ ] Existing user changes are preserved.
-- [ ] Behavior changes are absent or explicitly approved.
-- [ ] New dependencies have a documented decision and pinned version.
-- [ ] Tests cover success, failure, stdout, stderr, exit code, and database state.
-- [ ] No test touches the real home/data directory.
-- [ ] `gofmt`, `go vet`, tests, race tests, and relevant security checks pass.
-- [ ] Cross-platform build checks pass when platform code or dependencies changed.
-- [ ] Compatibility fixtures pass when command/storage behavior changed.
-- [ ] Benchmarks are reported when the startup path changed.
-- [ ] Help/version remain data-directory-free.
-- [ ] No partial write is possible after cancellation or failed validation.
-- [ ] Documentation and completion definitions remain synchronized.
+Do not use Python as a test oracle, touch real user data, treat historical behavior
+as an implicit requirement, add unmeasured dependencies, weaken security, claim
+end-to-end gains from microbenchmarks, combine unrelated changes, or silently
+regenerate goldens.
 
 ## Definition of done
 
-The Go rewrite is complete when:
-
-- Every documented Forge 2.1.0 command works through the Go executable.
-- Golden compatibility tests match exit codes, stdout, stderr, JSON, and database
-  state.
-- Existing Python-created databases work without conversion.
+- Approved Forge workflows are implemented and documented.
+- Tests express intended Go behavior across output, errors, and state.
+- Local data is protected by tested filesystem and SQLite invariants.
 - Quick, flag-driven, interactive, and cancellation paths are covered.
-- Filesystem and terminal-output security invariants are preserved.
-- Linux AMD64 and macOS ARM64 artifacts are built, attested, checksummed, and smoke
+- Linux AMD64 and macOS ARM64 artifacts are built, checksummed, attested, and smoke
   tested.
-- Warm help/version latency is at most 30 ms and small database commands are at most
-  50 ms on the designated benchmark host.
-- The Python implementation can be removed without losing a test oracle, fixture,
-  behavior contract, migration, completion, or release capability.
-- The resulting implementation remains small enough to understand in one sitting.
+- Warm help/version is at most 30 ms and small database commands at most 50 ms on
+  the benchmark host.
+- The project builds, tests, and releases without Python.
+- The implementation remains small enough to understand in one sitting.
 
 ## Architectural principle
 
 ```text
-compatibility first
+intentional product design
 -> thin startup path
 -> explicit domain rules
--> one secure database operation
+-> secure local storage
 -> deterministic output
 -> measured performance
 ```
 
-The rewrite succeeds when Forge feels immediate while existing users, scripts, and
-databases cannot tell that its implementation language changed.
+Forge succeeds when capturing useful thoughts and friction is faster than losing
+them—and when the implementation is free to become the best version of that idea.
