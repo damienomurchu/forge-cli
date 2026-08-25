@@ -6,11 +6,11 @@ CLI's product design, not a clone of the archived Python version.
 
 ## Status
 
-The product specification, performance harness, and fast Go CLI shell are
-established. Phase 1 risk spikes accepted initial SQLite and interactive prompt
-dependencies with measured constraints. Phase 2 introduced the native executable's
-help, version, and exit handling without database or prompt initialization. The
-next milestone is Phase 3: domain values, validation, and presentation.
+The product specification, performance harness, fast Go CLI shell, domain model,
+and initial presentation layer are established. Phase 3 completed the validated
+record model, deterministic JSON, and terminal-safe human output foundations.
+Phase 4 secure storage work has begun with centralized, read-only database path
+resolution; secure filesystem handling is next.
 
 ### Command availability
 
@@ -28,10 +28,9 @@ The current executable implements only the fast, data-free CLI shell:
 | `forge review` | Planned |
 
 The planned commands appear in top-level help to communicate the intended product
-surface, but invoking them currently returns an invalid-usage error. Domain rules,
-presentation, secure SQLite storage, non-interactive operations, interactive
-workflows, release packaging, and product hardening remain to be implemented in
-Phases 3 through 8.
+surface, but invoking them currently returns an invalid-usage error. Secure SQLite
+storage, non-interactive operations, interactive workflows, release packaging, and
+product hardening remain to be implemented in Phases 4 through 8.
 
 The architecture, phased plan, and acceptance criteria are in
 [the rewrite blueprint](docs/blueprint.md). Approved behavior is recorded in the

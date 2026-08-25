@@ -161,6 +161,11 @@ macOS: ~/Library/Application Support/forge/forge.db
 override: $FORGE_DATA_DIR/forge.db
 ```
 
+Configured base directories must be absolute. A relative `FORGE_DATA_DIR`,
+`XDG_DATA_HOME`, or `HOME` value is an error rather than an implicit path beneath
+the process working directory. Resolution is pure and does not inspect or create
+the resulting path.
+
 Importing an archived Python database is optional future work. If needed, implement
 an explicit, tested import or migration path; do not constrain the core model
 silently for compatibility.
@@ -328,10 +333,12 @@ continue.
 
 Current implementation status:
 
-- Phases 0 through 2 are complete: product contracts, dependency risk spikes, the
-  performance harness, and the data-free help/version shell are established.
-- Phase 3, domain and presentation, is next.
-- Phases 4 through 8 remain planned and unimplemented.
+- Phases 0 through 3 are complete: product contracts, dependency risk spikes, the
+  performance harness, data-free CLI shell, domain model, and presentation
+  foundations are established.
+- Phase 4, secure storage, is in progress; centralized read-only path resolution
+  is implemented and secure filesystem handling is next.
+- Phases 5 through 8 remain planned and unimplemented.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.
 
