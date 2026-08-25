@@ -140,8 +140,6 @@ CREATE INDEX idx_records_status_created
     ON records(status, created_at DESC, id DESC);
 CREATE INDEX idx_records_project_created
     ON records(project, created_at DESC, id DESC);
-CREATE INDEX idx_records_review
-    ON records(type, status, created_at DESC, id DESC);
 ```
 
 Go domain validation remains responsible for full Unicode whitespace and case
@@ -167,9 +165,10 @@ and all tags in one transaction. Friction records can never have tag rows.
 - Released migration files are immutable. Schema changes use new migrations.
 - `PRAGMA foreign_keys = ON` is required on every database connection.
 
-The implementation will choose and document a finite SQLite busy timeout during
-the driver spike. Journal and synchronous modes retain SQLite defaults until
-durability measurements justify a change.
+The initial driver decision in `docs/decisions/001-sqlite-driver.md` sets a 250 ms
+SQLite busy timeout. Application tests will confirm the resulting error remains
+actionable under real command execution. Journal and synchronous modes retain
+SQLite defaults until durability measurements justify a change.
 
 ## Command transactions
 
@@ -198,11 +197,12 @@ added if automatic migration during record creation proves insufficient.
 
 ## Index policy
 
-The initial indexes correspond to newest-first listing, individual type/status/
-project filters, and actionable-friction review. Before migration 001 is finalized,
-verify them with `EXPLAIN QUERY PLAN` against generated empty, small, and large
-fixtures. Add no further index without a measured query need; later index changes
-require a migration.
+The initial indexes correspond to newest-first listing and individual type, status,
+and project filters. Query-plan testing with mixed friction statuses showed that
+review uses `idx_records_type_created` to preserve result order; the candidate
+`(type, status, created_at, id)` index was redundant and is intentionally omitted.
+Add no further index without a measured query need; later index changes require a
+migration.
 
 ## Security and ownership
 

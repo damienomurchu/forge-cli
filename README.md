@@ -6,9 +6,10 @@ CLI's product design, not a clone of the archived Python version.
 
 ## Status
 
-The Go implementation is currently in the product-specification stage. The next
-milestone is Phase 0: confirming the command surface, intended behavior, storage
-shape, and performance measurement approach.
+The product specification and performance harness are established. Work is now in
+Phase 1, evaluating risky dependencies before production packages are introduced.
+The initial SQLite driver spike is complete; interactive prompting remains to be
+evaluated.
 
 The architecture, phased plan, and acceptance criteria are in
 [the rewrite blueprint](docs/blueprint.md). Approved behavior is recorded in the
