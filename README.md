@@ -16,7 +16,8 @@ migration inspection and application are also implemented. Repository creation i
 implemented for both captures and friction, and lookup by record ID is implemented;
 newest-first repository listing supports type, project, status, and limit filters.
 Atomic repository status updates are also implemented. The specialized review
-query is next.
+query is implemented, completing the planned repository surface. Secure storage
+lifecycle assembly is next.
 
 ### Command availability
 

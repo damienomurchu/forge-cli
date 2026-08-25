@@ -210,6 +210,10 @@ real change updates only `status` and `updated_at` atomically; a request for the
 stored status performs no write and preserves the original timestamp. Missing IDs,
 invalid timestamps, and database failures leave the record unchanged.
 
+Review filtering is implemented directly in SQL. It returns only friction in
+`captured`, `reviewing`, or `candidate` status using the standard deterministic
+ordering, and never loads excluded captures or terminal-status friction.
+
 ## Initialization and read-only commands
 
 Only commands that create records may create the data directory, database, or

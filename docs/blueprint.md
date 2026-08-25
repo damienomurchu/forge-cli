@@ -342,7 +342,8 @@ Current implementation status:
   and transactional capture and friction insertion are also implemented.
   Repository lookup by record ID and filtered newest-first listing are
   implemented, along with atomic status updates. The specialized review query is
-  next.
+  also implemented, completing the planned repository surface. Secure storage
+  lifecycle assembly is next.
 - Phases 5 through 8 remain planned and unimplemented.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.

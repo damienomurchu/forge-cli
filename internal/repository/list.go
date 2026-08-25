@@ -24,9 +24,17 @@ func (r *Repository) List(ctx context.Context, options ListOptions) ([]domain.Re
 		return nil, fmt.Errorf("validate list options: %w", err)
 	}
 	query, arguments := listQuery(options)
-	rows, err := r.db.QueryContext(ctx, query, arguments...)
+	records, err := r.readRecords(ctx, query, arguments...)
 	if err != nil {
 		return nil, fmt.Errorf("list records: %w", err)
+	}
+	return records, nil
+}
+
+func (r *Repository) readRecords(ctx context.Context, query string, arguments ...any) ([]domain.Record, error) {
+	rows, err := r.db.QueryContext(ctx, query, arguments...)
+	if err != nil {
+		return nil, fmt.Errorf("query records: %w", err)
 	}
 
 	storedRecords := make([]storedRecord, 0)
@@ -34,23 +42,23 @@ func (r *Repository) List(ctx context.Context, options ListOptions) ([]domain.Re
 		stored, err := scanStoredRecord(rows)
 		if err != nil {
 			rows.Close()
-			return nil, fmt.Errorf("scan listed record: %w", err)
+			return nil, fmt.Errorf("scan record: %w", err)
 		}
 		storedRecords = append(storedRecords, stored)
 	}
 	if err := rows.Err(); err != nil {
 		rows.Close()
-		return nil, fmt.Errorf("iterate listed records: %w", err)
+		return nil, fmt.Errorf("iterate records: %w", err)
 	}
 	if err := rows.Close(); err != nil {
-		return nil, fmt.Errorf("close listed records: %w", err)
+		return nil, fmt.Errorf("close records: %w", err)
 	}
 
 	records := make([]domain.Record, 0, len(storedRecords))
 	for _, stored := range storedRecords {
 		record, err := r.decodeStoredRecord(ctx, stored)
 		if err != nil {
-			return nil, fmt.Errorf("decode listed record: %w", err)
+			return nil, fmt.Errorf("decode record: %w", err)
 		}
 		records = append(records, record)
 	}

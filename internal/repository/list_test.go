@@ -97,7 +97,7 @@ func TestListFailsWholeOperationForMalformedRecord(t *testing.T) {
 	if got != nil {
 		t.Errorf("List() = %#v, want nil after failure", got)
 	}
-	if err == nil || !strings.Contains(err.Error(), "decode listed record") {
+	if err == nil || !strings.Contains(err.Error(), "list records: decode record") {
 		t.Fatalf("List() error = %v, want decode error", err)
 	}
 }
