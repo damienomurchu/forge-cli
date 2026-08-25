@@ -14,7 +14,23 @@ func WriteRecordJSON(w io.Writer, record domain.Record) error {
 	if err := record.Validate(); err != nil {
 		return err
 	}
+	return json.NewEncoder(w).Encode(recordToJSON(record))
+}
 
+// WriteRecordsJSON writes validated records as one JSON array followed by a
+// newline. Every record is validated before any output is written.
+func WriteRecordsJSON(w io.Writer, records []domain.Record) error {
+	encoded := make([]recordJSON, len(records))
+	for i, record := range records {
+		if err := record.Validate(); err != nil {
+			return err
+		}
+		encoded[i] = recordToJSON(record)
+	}
+	return json.NewEncoder(w).Encode(encoded)
+}
+
+func recordToJSON(record domain.Record) recordJSON {
 	var details any
 	if record.Type == domain.RecordTypeCapture {
 		details = captureDetailsJSON{
@@ -30,7 +46,7 @@ func WriteRecordJSON(w io.Writer, record domain.Record) error {
 		}
 	}
 
-	encoded := recordJSON{
+	return recordJSON{
 		ID:          record.ID.String(),
 		Type:        record.Type.String(),
 		Description: record.Description,
@@ -40,7 +56,6 @@ func WriteRecordJSON(w io.Writer, record domain.Record) error {
 		CreatedAt:   record.CreatedAt.String(),
 		UpdatedAt:   record.UpdatedAt.String(),
 	}
-	return json.NewEncoder(w).Encode(encoded)
 }
 
 type recordJSON struct {

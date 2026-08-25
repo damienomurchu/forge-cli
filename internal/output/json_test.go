@@ -73,6 +73,50 @@ func TestWriteRecordJSONValidatesBeforeWriting(t *testing.T) {
 	}
 }
 
+func TestWriteRecordsJSONMatchesGoldenAndPreservesOrder(t *testing.T) {
+	want, err := os.ReadFile(filepath.Join("testdata", "records.golden"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	records := []domain.Record{captureRecord(t), frictionRecord(t)}
+
+	var got bytes.Buffer
+	if err := WriteRecordsJSON(&got, records); err != nil {
+		t.Fatalf("WriteRecordsJSON() error = %v", err)
+	}
+	if got.String() != string(want) {
+		t.Errorf("JSON mismatch\ngot:  %s\nwant: %s", got.Bytes(), want)
+	}
+}
+
+func TestWriteRecordsJSONEmitsEmptyArray(t *testing.T) {
+	for _, records := range [][]domain.Record{nil, {}} {
+		var got bytes.Buffer
+		if err := WriteRecordsJSON(&got, records); err != nil {
+			t.Fatalf("WriteRecordsJSON() error = %v", err)
+		}
+		if got.String() != "[]\n" {
+			t.Errorf("WriteRecordsJSON() = %q, want %q", got.String(), "[]\n")
+		}
+	}
+}
+
+func TestWriteRecordsJSONValidatesAllRecordsBeforeWriting(t *testing.T) {
+	invalidRecord := frictionRecord(t)
+	invalidRecord.Details.Friction.Impact = "invalid"
+	records := []domain.Record{captureRecord(t), invalidRecord}
+
+	var got bytes.Buffer
+	err := WriteRecordsJSON(&got, records)
+	var invalid *domain.InvalidValueError
+	if !errors.As(err, &invalid) {
+		t.Fatalf("WriteRecordsJSON() error = %T %v, want *domain.InvalidValueError", err, err)
+	}
+	if got.Len() != 0 {
+		t.Errorf("WriteRecordsJSON() wrote %q before validation failed", got.String())
+	}
+}
+
 func captureRecord(t *testing.T) domain.Record {
 	t.Helper()
 	random := mustHex(t, "7c6b1d85d8ec46e4a4f975e182bf8109")
