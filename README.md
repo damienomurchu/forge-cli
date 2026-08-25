@@ -10,8 +10,9 @@ The Go implementation is currently in the product-specification stage. The next
 milestone is Phase 0: confirming the command surface, intended behavior, storage
 shape, and performance measurement approach.
 
-The complete contract, architecture, phased plan, and acceptance criteria are in
-[the rewrite blueprint](docs/blueprint.md).
+The architecture, phased plan, and acceptance criteria are in
+[the rewrite blueprint](docs/blueprint.md). The first approved command behavior is
+recorded in [the CLI contract](docs/cli-contract.md).
 
 ## Targets
 

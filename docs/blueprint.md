@@ -47,10 +47,11 @@ These are targets, not permission to weaken validation, durability, or security.
 
 Use these sources in order:
 
-1. The current product and command decisions in this document.
-2. Tests encoding approved Go behavior.
-3. Current user-facing documentation.
-4. The archived Python implementation, as historical context only.
+1. Approved product contracts, beginning with `docs/cli-contract.md`.
+2. The current product and command decisions in this document.
+3. Tests encoding approved Go behavior.
+4. Current user-facing documentation.
+5. The archived Python implementation, as historical context only.
 
 When Python differs, do not assume either behavior is correct. Choose the clearest
 design for the Go product, document material decisions, and add focused tests.
