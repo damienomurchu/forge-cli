@@ -77,7 +77,7 @@ Flags:
 const listHelp = `List records newest first.
 
 Usage:
-  forge list
+  forge list [--json]
 
 Output:
   <id>  <type>  <status>  <description>
@@ -86,6 +86,7 @@ Missing storage and empty results produce no output and succeed.
 
 Flags:
   -h, --help  Show help
+      --json   Write records as a JSON array
 `
 
 // Runtime contains process facilities used by the CLI. Keeping them explicit
@@ -145,8 +146,9 @@ func runList(ctx context.Context, args []string, rt Runtime) error {
 		_, err := io.WriteString(rt.Stdout, listHelp)
 		return err
 	}
-	if len(args) != 0 {
-		return &UsageError{Argument: args[0]}
+	jsonOutput, err := parseList(args)
+	if err != nil {
+		return err
 	}
 	databasePath, err := config.ResolveDatabasePath(rt.GOOS, rt.Env)
 	if err != nil {
@@ -154,6 +156,9 @@ func runList(ctx context.Context, args []string, rt Runtime) error {
 	}
 	session, err := storage.OpenExisting(ctx, databasePath, rt.EUID, storage.DatabaseReadOnly)
 	if errors.Is(err, storage.ErrStorageNotFound) {
+		if err := writeListResult(rt.Stdout, nil, jsonOutput); err != nil {
+			return fmt.Errorf("write list result: %w", err)
+		}
 		return nil
 	}
 	if err != nil {
@@ -170,10 +175,34 @@ func runList(ctx context.Context, args []string, rt Runtime) error {
 	if err := session.Close(); err != nil {
 		return fmt.Errorf("close storage after list: %w", err)
 	}
-	if err := output.WriteRecordList(rt.Stdout, records); err != nil {
+	if err := writeListResult(rt.Stdout, records, jsonOutput); err != nil {
 		return fmt.Errorf("write list result: %w", err)
 	}
 	return nil
+}
+
+func parseList(args []string) (bool, error) {
+	jsonOutput := false
+	for _, arg := range args {
+		if arg == "--json" {
+			jsonOutput = true
+			continue
+		}
+		return false, &UsageError{Argument: arg}
+	}
+	return jsonOutput, nil
+}
+
+func writeListResult(w io.Writer, records []domain.Record, jsonOutput bool) error {
+	if !jsonOutput {
+		return output.WriteRecordList(w, records)
+	}
+	var rendered bytes.Buffer
+	if err := output.WriteRecordsJSON(&rendered, records); err != nil {
+		return fmt.Errorf("render JSON: %w", err)
+	}
+	_, err := io.Copy(w, &rendered)
+	return err
 }
 
 func runFriction(ctx context.Context, args []string, rt Runtime) error {

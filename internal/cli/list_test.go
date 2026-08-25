@@ -63,8 +63,87 @@ func TestListMissingStorageIsSuccessfulAndEmpty(t *testing.T) {
 	}
 }
 
+func TestListJSONMissingStorageWritesEmptyArray(t *testing.T) {
+	dataDirectory := filepath.Join(t.TempDir(), "missing")
+	var stdout bytes.Buffer
+	err := Run(
+		context.Background(),
+		[]string{"list", "--json"},
+		quickCaptureRuntime(dataDirectory, &stdout),
+		"dev",
+	)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if got, want := stdout.String(), "[]\n"; got != want {
+		t.Errorf("stdout = %q, want %q", got, want)
+	}
+	if _, statErr := os.Stat(dataDirectory); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("data directory state error = %v, want not exist", statErr)
+	}
+}
+
 func TestListWritesRecordsNewestFirst(t *testing.T) {
 	dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+	createListRecords(t, dataDirectory)
+
+	var stdout bytes.Buffer
+	if err := Run(
+		context.Background(),
+		[]string{"list"},
+		quickCaptureRuntime(dataDirectory, &stdout),
+		"dev",
+	); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	want := "frc_00000000000000000000000000000000  friction  captured  Newer friction\n" +
+		"cap_00000000000000000000000000000000  capture  captured  Older capture\n"
+	if stdout.String() != want {
+		t.Errorf("stdout = %q, want %q", stdout.String(), want)
+	}
+}
+
+func TestListJSONWritesCompleteRecordsNewestFirst(t *testing.T) {
+	dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+	createListRecords(t, dataDirectory)
+
+	var stdout bytes.Buffer
+	if err := Run(
+		context.Background(),
+		[]string{"list", "--json"},
+		quickCaptureRuntime(dataDirectory, &stdout),
+		"dev",
+	); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	want := "[{\"id\":\"frc_00000000000000000000000000000000\",\"type\":\"friction\",\"description\":\"Newer friction\",\"project\":null,\"status\":\"captured\",\"details\":{\"frequency\":\"unknown\",\"impact\":\"unknown\",\"category\":\"other\",\"current_workaround\":null},\"created_at\":\"2026-08-25T12:00:00.000000Z\",\"updated_at\":\"2026-08-25T12:00:00.000000Z\"},{\"id\":\"cap_00000000000000000000000000000000\",\"type\":\"capture\",\"description\":\"Older capture\",\"project\":null,\"status\":\"captured\",\"details\":{\"kind\":\"thought\",\"tags\":[]},\"created_at\":\"2026-08-25T11:00:00.000000Z\",\"updated_at\":\"2026-08-25T11:00:00.000000Z\"}]\n"
+	if got := stdout.String(); got != want {
+		t.Errorf("stdout = %q, want %q", got, want)
+	}
+}
+
+func TestListUsageErrorsDoNotInspectEnvironment(t *testing.T) {
+	for _, args := range [][]string{
+		{"list", "extra"},
+		{"list", "--unknown"},
+	} {
+		t.Run(args[1], func(t *testing.T) {
+			rt := quickCaptureRuntime(t.TempDir(), &bytes.Buffer{})
+			rt.Env = func(string) string {
+				t.Fatal("list usage error inspected environment")
+				return ""
+			}
+			err := Run(context.Background(), args, rt, "dev")
+			var usageErr *UsageError
+			if !errors.As(err, &usageErr) {
+				t.Fatalf("Run() error = %T %v, want *UsageError", err, err)
+			}
+		})
+	}
+}
+
+func createListRecords(t *testing.T, dataDirectory string) {
+	t.Helper()
 	createRuntime := quickCaptureRuntime(dataDirectory, &bytes.Buffer{})
 	createRuntime.Now = func() time.Time {
 		return time.Date(2026, time.August, 25, 11, 0, 0, 0, time.UTC)
@@ -88,41 +167,6 @@ func TestListWritesRecordsNewestFirst(t *testing.T) {
 		"dev",
 	); err != nil {
 		t.Fatalf("create friction error = %v", err)
-	}
-
-	var stdout bytes.Buffer
-	if err := Run(
-		context.Background(),
-		[]string{"list"},
-		quickCaptureRuntime(dataDirectory, &stdout),
-		"dev",
-	); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-	want := "frc_00000000000000000000000000000000  friction  captured  Newer friction\n" +
-		"cap_00000000000000000000000000000000  capture  captured  Older capture\n"
-	if stdout.String() != want {
-		t.Errorf("stdout = %q, want %q", stdout.String(), want)
-	}
-}
-
-func TestListUsageErrorsDoNotInspectEnvironment(t *testing.T) {
-	for _, args := range [][]string{
-		{"list", "extra"},
-		{"list", "--json"},
-	} {
-		t.Run(args[1], func(t *testing.T) {
-			rt := quickCaptureRuntime(t.TempDir(), &bytes.Buffer{})
-			rt.Env = func(string) string {
-				t.Fatal("list usage error inspected environment")
-				return ""
-			}
-			err := Run(context.Background(), args, rt, "dev")
-			var usageErr *UsageError
-			if !errors.As(err, &usageErr) {
-				t.Fatalf("Run() error = %T %v, want *UsageError", err, err)
-			}
-		})
 	}
 }
 
