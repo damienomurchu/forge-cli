@@ -49,6 +49,6 @@ concise error to stderr, and exit `1`.
 ## Read-only guarantee
 
 `forge review` is strictly read-only. It does not change status, timestamps,
-metadata, migrations, or other application state. Filtering and ordering occur in
-the repository query rather than by loading and discarding unrelated records in
-the application layer.
+type-specific details, migrations, or other application state. Filtering and
+ordering occur in the repository query rather than by loading and discarding
+unrelated records in the application layer.

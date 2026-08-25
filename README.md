@@ -15,7 +15,8 @@ The architecture, phased plan, and acceptance criteria are in
 [CLI contract](docs/cli-contract.md), [capture contract](docs/capture-contract.md),
 [friction contract](docs/friction-contract.md), [list contract](docs/list-contract.md),
 [show contract](docs/show-contract.md), [update contract](docs/update-contract.md), and
-[review contract](docs/review-contract.md).
+[review contract](docs/review-contract.md). The shared domain and JSON schema are in
+the [record contract](docs/record-contract.md).
 
 ## Targets
 

@@ -141,8 +141,8 @@ status: captured
 - Lists and review emit arrays, including `[]` when empty.
 - Human output visibly escapes terminal controls and bidirectional controls.
 - Normal errors are concise and never include stack traces.
-- Exit-code categories and JSON schemas must be designed and tested before being
-  declared stable public interfaces.
+- Exit-code categories and JSON schemas are defined in `docs/cli-contract.md` and
+  `docs/record-contract.md` and must be tested before release.
 
 ## Storage design
 

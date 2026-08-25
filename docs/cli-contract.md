@@ -67,8 +67,8 @@ support it. Commands use human-readable output by default.
 Field names and JSON value types become public API when they are included in a
 released version. Minor releases may add optional fields. Removing or renaming a
 field, changing its type, or changing the top-level object/array shape requires a
-major-version decision and release. Exact record fields will be approved alongside
-the domain model before the first command that emits them is released.
+major-version decision and release. Record fields and types are defined in
+`docs/record-contract.md`.
 
 ## Exit statuses
 

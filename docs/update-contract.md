@@ -37,9 +37,9 @@ failure with exit status `1` and writes nothing.
 ## Update behavior
 
 When the requested status differs from the stored status, Forge changes only the
-record's status and `updated_at` timestamp. Description, type, project, metadata,
-creation time, ID, and all other fields are preserved. The status change and
-timestamp change occur atomically.
+record's status and `updated_at` timestamp. Description, type, project,
+type-specific details, creation time, ID, and all other fields are preserved. The
+status change and timestamp change occur atomically.
 
 Setting a record to its current status is a successful no-op. It does not change
 `updated_at` or any other stored value. The command still returns the existing

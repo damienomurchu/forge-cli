@@ -31,8 +31,8 @@ presentation includes all user-visible fields applicable to that record type.
 Exact layout will be approved with the implementation's golden tests.
 
 With `--json`, success emits exactly one complete record object followed by a
-newline. It obeys the stability and stream rules in `docs/cli-contract.md`. Exact
-field names and types will be approved with the domain model before release.
+newline. It obeys the stability and stream rules in `docs/cli-contract.md` and the
+schema in `docs/record-contract.md`.
 
 If no record has the supplied ID, Forge writes a concise not-found error to stderr,
 emits nothing to stdout, and exits `1`. Database, filesystem, and stored-data
@@ -42,6 +42,6 @@ not-found errors.
 ## Read-only guarantee
 
 `forge show` is strictly read-only. It does not modify the record, timestamps,
-metadata, status, migrations, or other application state. Any database
+type-specific details, status, migrations, or other application state. Any database
 initialization policy for read commands must preserve this guarantee and will be
 decided with the storage contract.

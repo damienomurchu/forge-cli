@@ -74,7 +74,7 @@ stdout. Exact wording will be approved with the implementation's golden test.
 
 With `--json`, success emits exactly one record object followed by a newline. It
 obeys `docs/cli-contract.md`: no human commentary is mixed into stdout, and the
-record's exact JSON fields must be approved with the domain model before release.
+record follows `docs/record-contract.md`.
 
 Database, filesystem, randomness, and other operational failures write a concise
 error to stderr, emit nothing to stdout, and exit `1`.
