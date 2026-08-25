@@ -56,7 +56,7 @@ const frictionHelp = `Record recurring friction.
 Usage:
   forge friction --quick [--project PROJECT] [--frequency FREQUENCY]
                  [--impact IMPACT] [--category CATEGORY]
-                 [--current-workaround TEXT] DESCRIPTION
+                 [--current-workaround TEXT] [--json] DESCRIPTION
 
 Defaults in quick mode:
   frequency  unknown
@@ -69,6 +69,7 @@ Flags:
       --current-workaround TEXT  Record the current workaround
       --frequency FREQUENCY      Set occurrence frequency (default: unknown)
       --impact IMPACT            Set severity (default: unknown)
+      --json                     Write the created record as JSON
       --project PROJECT          Associate the friction with a project
       --quick                    Record without prompting (currently required)
 `
@@ -162,6 +163,16 @@ func runFriction(ctx context.Context, args []string, rt Runtime) error {
 	if err := session.Close(); err != nil {
 		return fmt.Errorf("close storage after friction: %w", err)
 	}
+	if options.json {
+		var rendered bytes.Buffer
+		if err := output.WriteRecordJSON(&rendered, record); err != nil {
+			return fmt.Errorf("render friction result: %w", err)
+		}
+		if _, err := io.Copy(rt.Stdout, &rendered); err != nil {
+			return fmt.Errorf("write friction result: %w", err)
+		}
+		return nil
+	}
 	if err := output.WriteCreated(rt.Stdout, record); err != nil {
 		return fmt.Errorf("write friction result: %w", err)
 	}
@@ -175,6 +186,7 @@ type quickFrictionOptions struct {
 	impact            domain.Impact
 	category          domain.Category
 	currentWorkaround string
+	json              bool
 }
 
 func parseQuickFriction(args []string) (quickFrictionOptions, error) {
@@ -186,6 +198,7 @@ func parseQuickFriction(args []string) (quickFrictionOptions, error) {
 	category := domain.CategoryOther
 	project := ""
 	currentWorkaround := ""
+	jsonOutput := false
 	for index := 0; index < len(args); index++ {
 		arg := args[index]
 		switch {
@@ -193,6 +206,8 @@ func parseQuickFriction(args []string) (quickFrictionOptions, error) {
 			optionsEnded = true
 		case !optionsEnded && arg == "--quick":
 			quick = true
+		case !optionsEnded && arg == "--json":
+			jsonOutput = true
 		case !optionsEnded && arg == "--frequency":
 			if index+1 >= len(args) || strings.HasPrefix(args[index+1], "-") {
 				return quickFrictionOptions{}, &UsageError{Message: "--frequency requires a value"}
@@ -291,6 +306,7 @@ func parseQuickFriction(args []string) (quickFrictionOptions, error) {
 		impact:            impact,
 		category:          category,
 		currentWorkaround: currentWorkaround,
+		json:              jsonOutput,
 	}, nil
 }
 

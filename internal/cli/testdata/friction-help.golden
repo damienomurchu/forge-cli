@@ -3,7 +3,7 @@ Record recurring friction.
 Usage:
   forge friction --quick [--project PROJECT] [--frequency FREQUENCY]
                  [--impact IMPACT] [--category CATEGORY]
-                 [--current-workaround TEXT] DESCRIPTION
+                 [--current-workaround TEXT] [--json] DESCRIPTION
 
 Defaults in quick mode:
   frequency  unknown
@@ -16,5 +16,6 @@ Flags:
       --current-workaround TEXT  Record the current workaround
       --frequency FREQUENCY      Set occurrence frequency (default: unknown)
       --impact IMPACT            Set severity (default: unknown)
+      --json                     Write the created record as JSON
       --project PROJECT          Associate the friction with a project
       --quick                    Record without prompting (currently required)

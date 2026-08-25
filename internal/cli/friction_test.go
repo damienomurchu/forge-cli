@@ -268,6 +268,37 @@ func TestQuickFrictionNormalizesAndPersistsCurrentWorkaround(t *testing.T) {
 	}
 }
 
+func TestQuickFrictionWritesJSONRecord(t *testing.T) {
+	dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+	var stdout bytes.Buffer
+	err := Run(
+		context.Background(),
+		[]string{
+			"friction", "--quick", "--json", "--project", "forge",
+			"--frequency=weekly", "--impact", "high", "--category=verification",
+			"--current-workaround", "Search logs manually",
+			"CI failures require manual log searching",
+		},
+		quickCaptureRuntime(dataDirectory, &stdout),
+		"dev",
+	)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	want := "{\"id\":\"frc_00000000000000000000000000000000\",\"type\":\"friction\",\"description\":\"CI failures require manual log searching\",\"project\":\"forge\",\"status\":\"captured\",\"details\":{\"frequency\":\"weekly\",\"impact\":\"high\",\"category\":\"verification\",\"current_workaround\":\"Search logs manually\"},\"created_at\":\"2026-08-25T12:00:00.000000Z\",\"updated_at\":\"2026-08-25T12:00:00.000000Z\"}\n"
+	if got := stdout.String(); got != want {
+		t.Errorf("stdout = %q, want %q", got, want)
+	}
+	if strings.Contains(stdout.String(), "Created friction") {
+		t.Errorf("JSON stdout contains human confirmation: %q", stdout.String())
+	}
+
+	record := readQuickFriction(t, dataDirectory)
+	if record.Description != "CI failures require manual log searching" {
+		t.Errorf("stored description = %q, want JSON friction description", record.Description)
+	}
+}
+
 func TestQuickFrictionUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -284,7 +315,7 @@ func TestQuickFrictionUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 		{name: "empty category", args: []string{"friction", "--quick", "--category=", "description"}, wantErr: `--category requires a value`},
 		{name: "missing project", args: []string{"friction", "--quick", "--project"}, wantErr: `--project requires a value`},
 		{name: "missing current workaround", args: []string{"friction", "--quick", "--current-workaround"}, wantErr: `--current-workaround requires a value`},
-		{name: "unknown flag", args: []string{"friction", "--quick", "--json", "description"}, wantErr: `unknown argument "--json"`},
+		{name: "unknown flag", args: []string{"friction", "--quick", "--unknown", "description"}, wantErr: `unknown argument "--unknown"`},
 		{name: "extra description", args: []string{"friction", "--quick", "one", "two"}, wantErr: `unexpected argument "two"`},
 	}
 	for _, tt := range tests {
@@ -312,10 +343,10 @@ func TestQuickFrictionValidationHappensBeforeStorage(t *testing.T) {
 		args    []string
 		wantErr string
 	}{
-		{name: "description", args: []string{"friction", "--quick", " \t "}, wantErr: "invalid description"},
-		{name: "frequency", args: []string{"friction", "--quick", "--frequency", "often", "description"}, wantErr: `invalid frequency "often"`},
-		{name: "impact", args: []string{"friction", "--quick", "--impact", "severe", "description"}, wantErr: `invalid impact "severe"`},
-		{name: "category", args: []string{"friction", "--quick", "--category", "process", "description"}, wantErr: `invalid category "process"`},
+		{name: "description", args: []string{"friction", "--quick", "--json", " \t "}, wantErr: "invalid description"},
+		{name: "frequency", args: []string{"friction", "--quick", "--json", "--frequency", "often", "description"}, wantErr: `invalid frequency "often"`},
+		{name: "impact", args: []string{"friction", "--quick", "--json", "--impact", "severe", "description"}, wantErr: `invalid impact "severe"`},
+		{name: "category", args: []string{"friction", "--quick", "--json", "--category", "process", "description"}, wantErr: `invalid category "process"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -344,7 +375,7 @@ func TestQuickFrictionStorageFailureProducesNoOutput(t *testing.T) {
 	var stdout bytes.Buffer
 	err := Run(
 		context.Background(),
-		[]string{"friction", "--quick", "description"},
+		[]string{"friction", "--quick", "--json", "description"},
 		quickCaptureRuntime("relative", &stdout),
 		"dev",
 	)
