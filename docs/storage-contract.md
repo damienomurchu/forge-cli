@@ -185,6 +185,10 @@ SQLite defaults until durability measurements justify a change.
 - Constraint, lock, cancellation, clock, and randomness failures leave no partial
   record or update.
 
+Transactional capture insertion is implemented: the validated record row and all
+ordered tag rows commit together, and any record or tag failure rolls back the
+entire capture.
+
 ## Initialization and read-only commands
 
 Only commands that create records may create the data directory, database, or

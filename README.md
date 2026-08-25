@@ -13,6 +13,7 @@ Phase 4 secure storage work now includes centralized database path resolution an
 secure preparation and opening of owned, private data directories and database
 files, plus single-connection SQLite setup with required pragmas. Transactional
 migration inspection and application are also implemented. Repository operations
+have begun with transactional capture insertion; remaining repository operations
 are next.
 
 ### Command availability
