@@ -45,6 +45,11 @@ build:
     mkdir -p bin
     mise exec -- go build -o bin/forge ./cmd/forge
 
+# Build a stripped local executable for performance measurement.
+build-release:
+    mkdir -p bin
+    mise exec -- go build -trimpath -ldflags="-s -w" -o bin/forge ./cmd/forge
+
 # Build Forge and exercise the implemented help and version paths.
 try: build
     ./bin/forge --help
@@ -64,6 +69,10 @@ ci: check cross-build benchmark-test
 # Test the benchmark harness without Forge or hyperfine.
 benchmark-test:
     scripts/test-benchmark.sh
+
+# Build and benchmark a release-style local Forge executable.
+bench: build-release
+    scripts/benchmark.sh ./bin/forge
 
 # Benchmark a candidate Forge executable (usage: just benchmark ./forge).
 benchmark forge_bin:

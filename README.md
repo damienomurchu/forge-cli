@@ -103,12 +103,15 @@ mise exec -- go build \
 With `hyperfine` 1.18.0 or newer installed, benchmark a candidate executable using
 isolated temporary data:
 
-```bash
-just benchmark ./bin/forge
+```fish
+just bench
 ```
+
+This builds a stripped, release-style `bin/forge` first. To benchmark an existing
+candidate without rebuilding it, run `just benchmark /path/to/forge`.
 
 The harness itself can be checked without Forge or hyperfine:
 
-```bash
+```fish
 just benchmark-test
 ```
