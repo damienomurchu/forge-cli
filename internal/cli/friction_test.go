@@ -45,12 +45,12 @@ func TestFrictionHelp(t *testing.T) {
 }
 
 func TestFrictionHelpAfterOptionTerminatorIsDescription(t *testing.T) {
-	description, err := parseQuickFriction([]string{"--quick", "--", "--help"})
+	options, err := parseQuickFriction([]string{"--quick", "--", "--help"})
 	if err != nil {
 		t.Fatalf("parseQuickFriction() error = %v", err)
 	}
-	if description != "--help" {
-		t.Errorf("description = %q, want --help", description)
+	if options.description != "--help" {
+		t.Errorf("description = %q, want --help", options.description)
 	}
 }
 
@@ -100,6 +100,30 @@ func TestQuickFrictionAcceptsOptionTerminator(t *testing.T) {
 	}
 }
 
+func TestQuickFrictionPersistsExplicitFrequency(t *testing.T) {
+	for _, args := range [][]string{
+		{"friction", "--quick", "--frequency", "weekly", "spaced frequency"},
+		{"friction", "--quick", "--frequency=weekly", "equals frequency"},
+	} {
+		t.Run(args[2], func(t *testing.T) {
+			dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+			var stdout bytes.Buffer
+			err := Run(
+				context.Background(),
+				args,
+				quickCaptureRuntime(dataDirectory, &stdout),
+				"dev",
+			)
+			if err != nil {
+				t.Fatalf("Run() error = %v", err)
+			}
+			if got := readQuickFriction(t, dataDirectory).Details.Friction.Frequency; got != domain.FrequencyWeekly {
+				t.Errorf("stored frequency = %q, want weekly", got)
+			}
+		})
+	}
+}
+
 func TestQuickFrictionUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -108,6 +132,8 @@ func TestQuickFrictionUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 	}{
 		{name: "missing description", args: []string{"friction", "--quick"}, wantErr: "friction requires a description"},
 		{name: "interactive not implemented", args: []string{"friction", "description"}, wantErr: "friction currently requires --quick"},
+		{name: "missing frequency", args: []string{"friction", "--quick", "--frequency"}, wantErr: `--frequency requires a value`},
+		{name: "empty frequency", args: []string{"friction", "--quick", "--frequency=", "description"}, wantErr: `--frequency requires a value`},
 		{name: "unknown flag", args: []string{"friction", "--quick", "--impact", "high", "description"}, wantErr: `unknown argument "--impact"`},
 		{name: "extra description", args: []string{"friction", "--quick", "one", "two"}, wantErr: `unexpected argument "two"`},
 	}
@@ -131,22 +157,34 @@ func TestQuickFrictionUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 }
 
 func TestQuickFrictionValidationHappensBeforeStorage(t *testing.T) {
-	dataDirectory := filepath.Join(t.TempDir(), "missing")
-	var stdout bytes.Buffer
-	rt := quickCaptureRuntime(dataDirectory, &stdout)
-	rt.Env = func(string) string {
-		t.Fatal("invalid friction inspected environment")
-		return ""
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr string
+	}{
+		{name: "description", args: []string{"friction", "--quick", " \t "}, wantErr: "invalid description"},
+		{name: "frequency", args: []string{"friction", "--quick", "--frequency", "often", "description"}, wantErr: `invalid frequency "often"`},
 	}
-	err := Run(context.Background(), []string{"friction", "--quick", " \t "}, rt, "dev")
-	if err == nil || !strings.Contains(err.Error(), "invalid description") {
-		t.Fatalf("Run() error = %v, want invalid-description error", err)
-	}
-	if _, statErr := os.Stat(dataDirectory); !errors.Is(statErr, os.ErrNotExist) {
-		t.Fatalf("data directory state error = %v, want not exist", statErr)
-	}
-	if stdout.Len() != 0 {
-		t.Errorf("stdout = %q, want empty", stdout.String())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dataDirectory := filepath.Join(t.TempDir(), "missing")
+			var stdout bytes.Buffer
+			rt := quickCaptureRuntime(dataDirectory, &stdout)
+			rt.Env = func(string) string {
+				t.Fatal("invalid friction inspected environment")
+				return ""
+			}
+			err := Run(context.Background(), tt.args, rt, "dev")
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("Run() error = %v, want error containing %q", err, tt.wantErr)
+			}
+			if _, statErr := os.Stat(dataDirectory); !errors.Is(statErr, os.ErrNotExist) {
+				t.Fatalf("data directory state error = %v, want not exist", statErr)
+			}
+			if stdout.Len() != 0 {
+				t.Errorf("stdout = %q, want empty", stdout.String())
+			}
+		})
 	}
 }
 

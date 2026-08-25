@@ -1,7 +1,7 @@
 Record recurring friction.
 
 Usage:
-  forge friction --quick DESCRIPTION
+  forge friction --quick [--frequency FREQUENCY] DESCRIPTION
 
 Defaults in quick mode:
   frequency  unknown
@@ -9,5 +9,6 @@ Defaults in quick mode:
   category   other
 
 Flags:
-  -h, --help    Show help
-      --quick   Record without prompting (currently required)
+  -h, --help                 Show help
+      --frequency FREQUENCY  Set occurrence frequency (default: unknown)
+      --quick                Record without prompting (currently required)

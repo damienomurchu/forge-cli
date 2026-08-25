@@ -54,7 +54,7 @@ Flags:
 const frictionHelp = `Record recurring friction.
 
 Usage:
-  forge friction --quick DESCRIPTION
+  forge friction --quick [--frequency FREQUENCY] DESCRIPTION
 
 Defaults in quick mode:
   frequency  unknown
@@ -62,8 +62,9 @@ Defaults in quick mode:
   category   other
 
 Flags:
-  -h, --help    Show help
-      --quick   Record without prompting (currently required)
+  -h, --help                 Show help
+      --frequency FREQUENCY  Set occurrence frequency (default: unknown)
+      --quick                Record without prompting (currently required)
 `
 
 // Runtime contains process facilities used by the CLI. Keeping them explicit
@@ -121,13 +122,13 @@ func runFriction(ctx context.Context, args []string, rt Runtime) error {
 		_, err := io.WriteString(rt.Stdout, frictionHelp)
 		return err
 	}
-	description, err := parseQuickFriction(args)
+	options, err := parseQuickFriction(args)
 	if err != nil {
 		return err
 	}
 	record, err := domain.NewFriction(domain.FrictionInput{
-		Description: description,
-		Frequency:   domain.FrequencyUnknown,
+		Description: options.description,
+		Frequency:   options.frequency,
 		Impact:      domain.ImpactUnknown,
 		Category:    domain.CategoryOther,
 	}, rt.Now(), rt.Random)
@@ -159,32 +160,62 @@ func runFriction(ctx context.Context, args []string, rt Runtime) error {
 	return nil
 }
 
-func parseQuickFriction(args []string) (string, error) {
+type quickFrictionOptions struct {
+	description string
+	frequency   domain.Frequency
+}
+
+func parseQuickFriction(args []string) (quickFrictionOptions, error) {
 	quick := false
 	optionsEnded := false
 	positionals := make([]string, 0, 1)
-	for _, arg := range args {
+	frequency := domain.FrequencyUnknown
+	for index := 0; index < len(args); index++ {
+		arg := args[index]
 		switch {
 		case !optionsEnded && arg == "--":
 			optionsEnded = true
 		case !optionsEnded && arg == "--quick":
 			quick = true
+		case !optionsEnded && arg == "--frequency":
+			if index+1 >= len(args) || strings.HasPrefix(args[index+1], "-") {
+				return quickFrictionOptions{}, &UsageError{Message: "--frequency requires a value"}
+			}
+			index++
+			parsed, err := domain.ParseFrequency(args[index])
+			if err != nil {
+				return quickFrictionOptions{}, err
+			}
+			frequency = parsed
+		case !optionsEnded && strings.HasPrefix(arg, "--frequency="):
+			value := strings.TrimPrefix(arg, "--frequency=")
+			if value == "" {
+				return quickFrictionOptions{}, &UsageError{Message: "--frequency requires a value"}
+			}
+			parsed, err := domain.ParseFrequency(value)
+			if err != nil {
+				return quickFrictionOptions{}, err
+			}
+			frequency = parsed
 		case !optionsEnded && strings.HasPrefix(arg, "-"):
-			return "", &UsageError{Argument: arg}
+			return quickFrictionOptions{}, &UsageError{Argument: arg}
 		default:
 			positionals = append(positionals, arg)
 		}
 	}
 	if len(positionals) == 0 {
-		return "", &UsageError{Message: "friction requires a description"}
+		return quickFrictionOptions{}, &UsageError{Message: "friction requires a description"}
 	}
 	if len(positionals) > 1 {
-		return "", &UsageError{Message: fmt.Sprintf("unexpected argument %q", positionals[1])}
+		return quickFrictionOptions{}, &UsageError{Message: fmt.Sprintf("unexpected argument %q", positionals[1])}
 	}
 	if !quick {
-		return "", &UsageError{Message: "friction currently requires --quick"}
+		return quickFrictionOptions{}, &UsageError{Message: "friction currently requires --quick"}
 	}
-	return positionals[0], nil
+	return quickFrictionOptions{
+		description: positionals[0],
+		frequency:   frequency,
+	}, nil
 }
 
 func runCapture(ctx context.Context, args []string, rt Runtime) error {
