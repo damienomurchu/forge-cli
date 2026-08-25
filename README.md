@@ -13,8 +13,8 @@ shape, and performance measurement approach.
 The architecture, phased plan, and acceptance criteria are in
 [the rewrite blueprint](docs/blueprint.md). Approved behavior is recorded in the
 [CLI contract](docs/cli-contract.md), [capture contract](docs/capture-contract.md),
-[friction contract](docs/friction-contract.md), and
-[list contract](docs/list-contract.md).
+[friction contract](docs/friction-contract.md), [list contract](docs/list-contract.md),
+and [show contract](docs/show-contract.md).
 
 ## Targets
 
