@@ -17,7 +17,8 @@ implemented for both captures and friction, and lookup by record ID is implement
 newest-first repository listing supports type, project, status, and limit filters.
 Atomic repository status updates are also implemented. The specialized review
 query is implemented, completing the planned repository surface. Secure storage
-lifecycle assembly is next.
+now has distinct create-or-open and open-existing directory primitives; lifecycle
+assembly is next.
 
 ### Command availability
 

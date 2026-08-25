@@ -343,7 +343,8 @@ Current implementation status:
   Repository lookup by record ID and filtered newest-first listing are
   implemented, along with atomic status updates. The specialized review query is
   also implemented, completing the planned repository surface. Secure storage
-  lifecycle assembly is next.
+  now distinguishes create-or-open from open-existing directory access; lifecycle
+  assembly is next.
 - Phases 5 through 8 remain planned and unimplemented.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.

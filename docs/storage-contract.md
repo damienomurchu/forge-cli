@@ -250,6 +250,11 @@ the directory without following links, verifies effective-user ownership before
 correcting permissions to `0700`, and returns the verified open handle for later
 descriptor-relative database operations.
 
+The open-existing variant applies the same checks but never creates the data
+directory or any parent. A missing path remains absent and returns an error
+classifiable as `os.ErrNotExist`, allowing read-only workflows to select their
+specified empty or not-found behavior without initialization.
+
 Database files are opened relative to that verified directory handle and without
 following links. Read-only and existing read-write modes never create a missing
 file; create mode atomically opens or creates it with mode `0600`. Every mode

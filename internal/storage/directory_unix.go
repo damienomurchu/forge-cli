@@ -20,6 +20,17 @@ const privateDirectoryMode = 0o700
 // The returned handle pins the verified directory for later descriptor-relative
 // operations. The caller must close it.
 func PrepareDataDirectory(path string, effectiveUID int) (*os.File, error) {
+	return openDataDirectory(path, effectiveUID, true)
+}
+
+// OpenDataDirectory securely opens an existing data directory without creating
+// it or any parent. The returned missing-path error is classifiable with
+// errors.Is(err, os.ErrNotExist). The caller must close the returned handle.
+func OpenDataDirectory(path string, effectiveUID int) (*os.File, error) {
+	return openDataDirectory(path, effectiveUID, false)
+}
+
+func openDataDirectory(path string, effectiveUID int, create bool) (*os.File, error) {
 	if !filepath.IsAbs(path) {
 		return nil, fmt.Errorf("data directory path must be absolute")
 	}
@@ -39,8 +50,10 @@ func PrepareDataDirectory(path string, effectiveUID int) (*os.File, error) {
 	}
 	defer unix.Close(parentFD)
 
-	if err := unix.Mkdirat(parentFD, name, privateDirectoryMode); err != nil && err != unix.EEXIST {
-		return nil, fmt.Errorf("create data directory: %w", err)
+	if create {
+		if err := unix.Mkdirat(parentFD, name, privateDirectoryMode); err != nil && err != unix.EEXIST {
+			return nil, fmt.Errorf("create data directory: %w", err)
+		}
 	}
 
 	var pathInfo unix.Stat_t

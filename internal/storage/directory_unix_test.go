@@ -3,11 +3,111 @@
 package storage
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestOpenDataDirectoryDoesNotCreateMissingDirectory(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "forge")
+	directory, err := OpenDataDirectory(path, os.Geteuid())
+	if directory != nil {
+		directory.Close()
+		t.Fatalf("OpenDataDirectory() returned a handle, want nil")
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("OpenDataDirectory() error = %v, want not exist", err)
+	}
+	if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("data directory state error = %v, want not exist", err)
+	}
+}
+
+func TestOpenDataDirectoryOpensAndRestrictsExistingDirectory(t *testing.T) {
+	for _, mode := range []os.FileMode{0o700, 0o755} {
+		t.Run(mode.String(), func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "forge")
+			if err := os.Mkdir(path, 0o700); err != nil {
+				t.Fatalf("Mkdir() error = %v", err)
+			}
+			if err := os.Chmod(path, mode); err != nil {
+				t.Fatalf("Chmod() error = %v", err)
+			}
+
+			directory, err := OpenDataDirectory(path, os.Geteuid())
+			if err != nil {
+				t.Fatalf("OpenDataDirectory() error = %v", err)
+			}
+			t.Cleanup(func() { directory.Close() })
+			assertDirectoryMode(t, directory, 0o700)
+		})
+	}
+}
+
+func TestOpenDataDirectoryRejectsUnsafeExistingPaths(t *testing.T) {
+	parent := t.TempDir()
+	realDirectory := filepath.Join(parent, "real")
+	if err := os.Mkdir(realDirectory, 0o700); err != nil {
+		t.Fatalf("Mkdir() error = %v", err)
+	}
+	symlink := filepath.Join(parent, "link")
+	if err := os.Symlink(realDirectory, symlink); err != nil {
+		t.Fatalf("Symlink() error = %v", err)
+	}
+	regularFile := filepath.Join(parent, "file")
+	if err := os.WriteFile(regularFile, nil, 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	tests := []struct {
+		name    string
+		path    string
+		wantErr string
+	}{
+		{name: "symbolic link", path: symlink, wantErr: "must not be a symbolic link"},
+		{name: "regular file", path: regularFile, wantErr: "is not a directory"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			directory, err := OpenDataDirectory(tt.path, os.Geteuid())
+			if directory != nil {
+				directory.Close()
+				t.Fatalf("OpenDataDirectory() returned a handle, want nil")
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("OpenDataDirectory() error = %v, want containing %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestOpenDataDirectoryChecksOwnershipBeforePermissions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "forge")
+	if err := os.Mkdir(path, 0o700); err != nil {
+		t.Fatalf("Mkdir() error = %v", err)
+	}
+	if err := os.Chmod(path, 0o755); err != nil {
+		t.Fatalf("Chmod() error = %v", err)
+	}
+
+	directory, err := OpenDataDirectory(path, os.Geteuid()+1)
+	if directory != nil {
+		directory.Close()
+		t.Fatalf("OpenDataDirectory() returned a handle, want nil")
+	}
+	if err == nil || !strings.Contains(err.Error(), "is owned by user ID") {
+		t.Fatalf("OpenDataDirectory() error = %v, want ownership error", err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("Stat() error = %v", err)
+	}
+	if got := info.Mode().Perm(); got != 0o755 {
+		t.Errorf("directory mode after rejected ownership = %04o, want 0755", got)
+	}
+}
 
 func TestPrepareDataDirectoryCreatesPrivateDirectory(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "forge")
