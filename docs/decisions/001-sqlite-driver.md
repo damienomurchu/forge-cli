@@ -79,8 +79,8 @@ therefore redundant and was removed from migration 001 before release.
 - Clean compilation is CPU- and memory-intensive.
 - The runtime module graph includes nine indirect modules in `go.mod`.
 - A native macOS runtime smoke test remains required in CI.
-- Race testing could not run on this host because no C compiler is installed; it
-  remains required in CI even though release builds use no CGO.
+- Race testing passes with GCC 16.2.1. It remains required in CI even though release
+  builds use no CGO.
 - Lock errors still need application-level classification and actionable wording.
 
 ## Alternatives

@@ -6,10 +6,10 @@ CLI's product design, not a clone of the archived Python version.
 
 ## Status
 
-The product specification and performance harness are established. Work is now in
-Phase 1, evaluating risky dependencies before production packages are introduced.
-The initial SQLite driver spike is complete; interactive prompting remains to be
-evaluated.
+The product specification and performance harness are established. Phase 1 risk
+spikes accepted initial SQLite and interactive prompt dependencies with measured
+constraints. The next milestone is Phase 2: the fast Go CLI shell for help and
+version, without database or prompt initialization.
 
 The architecture, phased plan, and acceptance criteria are in
 [the rewrite blueprint](docs/blueprint.md). Approved behavior is recorded in the

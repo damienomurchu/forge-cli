@@ -190,6 +190,8 @@ The SQLite spike must cover native cross-builds, startup, size, CRUD, migrations
 locking, durability, and maintenance. Pure Go is desirable but not pre-approved.
 The initial accepted driver and measured tradeoffs are recorded in
 `docs/decisions/001-sqlite-driver.md`.
+The accepted interactive prompt library, adapter constraints, and measured costs
+are recorded in `docs/decisions/002-prompt-library.md`.
 
 ## Architecture
 
