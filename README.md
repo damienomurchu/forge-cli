@@ -35,7 +35,7 @@ data-backed command slice:
 | `forge capture --quick [--project PROJECT] [--kind KIND] [--tags TAGS] [--json] DESCRIPTION` | Implemented |
 | Other `forge capture` options and interactive mode | Planned |
 | `forge friction -h`, `forge friction --help` | Implemented |
-| `forge friction --quick [--frequency FREQUENCY] [--impact IMPACT] DESCRIPTION` | Implemented |
+| `forge friction --quick [--frequency FREQUENCY] [--impact IMPACT] [--category CATEGORY] DESCRIPTION` | Implemented |
 | Other `forge friction` options and interactive mode | Planned |
 | `forge list` | Planned |
 | `forge show` | Planned |

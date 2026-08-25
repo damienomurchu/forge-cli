@@ -357,8 +357,8 @@ Current implementation status:
   first quick-friction slice accepts one description, applies all documented
   classification defaults, and persists with human confirmation. Friction-specific
   help is implemented as a data-free path with stable golden output. Quick
-  friction accepts explicit frequency and impact values using either supported
-  long-flag syntax.
+  friction accepts explicit frequency, impact, and category values using either
+  supported long-flag syntax.
 - Phases 6 through 8 remain planned and unimplemented.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.
