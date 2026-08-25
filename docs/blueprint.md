@@ -236,7 +236,8 @@ func Run(ctx context.Context, args []string, rt Runtime) error
 - Measure release binaries, not just package microbenchmarks.
 
 Track median, p90, binary size, and peak RSS for representative commands against
-empty, small, and generated large databases. Use a stable host for release results.
+empty, small, and generated large databases according to
+`docs/performance-contract.md`. Use a stable host for release results.
 
 ## Storage implementation
 
@@ -326,7 +327,8 @@ continue.
 - Confirm the command surface, terminology, defaults, output principles, exit-code
   categories, and JSON stability policy.
 - Validate the approved typed-column schema and indexes before migration 001.
-- Establish reproducible performance measurement using no user data.
+- Maintain the reproducible, user-data-free measurement contract and harness in
+  `docs/performance-contract.md` and `scripts/benchmark.sh`.
 
 Acceptance: open decisions are explicit, intended behavior is testable, and no step
 depends on running Python.

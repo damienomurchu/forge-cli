@@ -33,3 +33,18 @@ Work proceeds one blueprint phase at a time. The archived Python implementation 
 inform product discussions, but it is not a compatibility oracle, dependency, or
 release target. The blueprint is authoritative until the Go implementation and its
 tests establish more detailed contracts.
+
+### Performance harness
+
+With `hyperfine` 1.18.0 or newer installed, benchmark a candidate executable using
+isolated temporary data:
+
+```bash
+scripts/benchmark.sh /path/to/forge
+```
+
+The harness itself can be checked without Forge or hyperfine:
+
+```bash
+scripts/test-benchmark.sh
+```
