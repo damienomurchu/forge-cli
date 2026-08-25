@@ -68,13 +68,13 @@ forge --version
 
 forge capture [--quick] [--project PROJECT] [--kind KIND] [--tags TAGS]
               [--json] DESCRIPTION
-forge capture list [--limit N] [--project PROJECT] [--status STATUS] [--json]
 
 forge friction [--quick] [--project PROJECT] [--frequency FREQUENCY]
                [--impact IMPACT] [--category CATEGORY]
                [--current-workaround TEXT] [--json] DESCRIPTION
-forge friction list [--limit N] [--project PROJECT] [--status STATUS] [--json]
 
+forge list [--limit N] [--type TYPE] [--project PROJECT] [--status STATUS]
+           [--json]
 forge show RECORD_ID [--json]
 forge update RECORD_ID --status STATUS
 forge review [friction] [--json]

@@ -12,7 +12,9 @@ shape, and performance measurement approach.
 
 The architecture, phased plan, and acceptance criteria are in
 [the rewrite blueprint](docs/blueprint.md). The first approved command behavior is
-recorded in [the CLI contract](docs/cli-contract.md).
+recorded in [the CLI contract](docs/cli-contract.md),
+[capture contract](docs/capture-contract.md), and
+[list contract](docs/list-contract.md).
 
 ## Targets
 
