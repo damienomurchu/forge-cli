@@ -47,6 +47,46 @@ func TestVersion(t *testing.T) {
 	}
 }
 
+func TestCaptureHelp(t *testing.T) {
+	want, err := os.ReadFile(filepath.Join("testdata", "capture-help.golden"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, args := range [][]string{
+		{"capture", "-h"},
+		{"capture", "--help"},
+		{"capture", "--quick", "--unknown", "--help"},
+	} {
+		t.Run(strings.Join(args[1:], " "), func(t *testing.T) {
+			var stdout bytes.Buffer
+			rt := Runtime{
+				Stdout: &stdout,
+				Env: func(string) string {
+					t.Fatal("capture help inspected the environment")
+					return ""
+				},
+			}
+			if err := Run(context.Background(), args, rt, "dev"); err != nil {
+				t.Fatalf("Run() error = %v", err)
+			}
+			if got := stdout.String(); got != string(want) {
+				t.Errorf("capture help mismatch\ngot:\n%s\nwant:\n%s", got, want)
+			}
+		})
+	}
+}
+
+func TestCaptureHelpAfterOptionTerminatorIsDescription(t *testing.T) {
+	description, err := parseQuickCapture([]string{"--quick", "--", "--help"})
+	if err != nil {
+		t.Fatalf("parseQuickCapture() error = %v", err)
+	}
+	if description != "--help" {
+		t.Errorf("description = %q, want --help", description)
+	}
+}
+
 func TestUsageError(t *testing.T) {
 	var stdout bytes.Buffer
 	err := Run(context.Background(), []string{"unknown"}, Runtime{Stdout: &stdout}, "dev")

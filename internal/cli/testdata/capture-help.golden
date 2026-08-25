@@ -1,0 +1,8 @@
+Capture a thought, idea, or observation.
+
+Usage:
+  forge capture --quick DESCRIPTION
+
+Flags:
+  -h, --help    Show help
+      --quick   Capture without prompting (currently required)

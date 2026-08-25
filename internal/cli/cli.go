@@ -1,5 +1,4 @@
-// Package cli implements Forge's command-line interface without initializing
-// storage or interactive prompting.
+// Package cli implements Forge's command-line interface.
 package cli
 
 import (
@@ -33,6 +32,16 @@ Commands:
 Flags:
   -h, --help      Show help
       --version   Show version
+`
+
+const captureHelp = `Capture a thought, idea, or observation.
+
+Usage:
+  forge capture --quick DESCRIPTION
+
+Flags:
+  -h, --help    Show help
+      --quick   Capture without prompting (currently required)
 `
 
 // Runtime contains process facilities used by the CLI. Keeping them explicit
@@ -84,6 +93,10 @@ func Run(ctx context.Context, args []string, rt Runtime, version string) error {
 }
 
 func runCapture(ctx context.Context, args []string, rt Runtime) error {
+	if captureHelpRequested(args) {
+		_, err := io.WriteString(rt.Stdout, captureHelp)
+		return err
+	}
 	description, err := parseQuickCapture(args)
 	if err != nil {
 		return err
@@ -118,6 +131,18 @@ func runCapture(ctx context.Context, args []string, rt Runtime) error {
 		return fmt.Errorf("write capture result: %w", err)
 	}
 	return nil
+}
+
+func captureHelpRequested(args []string) bool {
+	for _, arg := range args {
+		if arg == "--" {
+			return false
+		}
+		if arg == "-h" || arg == "--help" {
+			return true
+		}
+	}
+	return false
 }
 
 func parseQuickCapture(args []string) (string, error) {
