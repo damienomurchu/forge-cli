@@ -50,6 +50,21 @@ deterministic fallback `dev`.
 - Usage mistakes, validation failures, and operational errors go to stderr.
 - An error must not duplicate its message across stdout and stderr.
 
+## Terminal-safe human text
+
+Human-readable output never writes untrusted terminal controls or Unicode
+bidirectional controls literally. Forge preserves ordinary printable Unicode and
+uses these visible escapes:
+
+- newline, carriage return, and tab become `\n`, `\r`, and `\t`;
+- a literal backslash becomes `\\` so escapes remain unambiguous;
+- byte-range controls and invalid UTF-8 bytes use lowercase `\xhh`;
+- other non-graphic Unicode and bidirectional controls use lowercase `\uhhhh` or
+  `\Uhhhhhhhh` according to code-point width.
+
+This escaping applies to human presentation. JSON mode continues to use valid JSON
+string encoding.
+
 ## JSON output
 
 JSON is an explicit machine-readable mode enabled with `--json` on commands that
