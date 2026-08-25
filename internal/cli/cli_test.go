@@ -241,6 +241,54 @@ func TestQuickCapturePersistsExplicitKind(t *testing.T) {
 	}
 }
 
+func TestQuickCaptureNormalizesAndPersistsProject(t *testing.T) {
+	tests := []struct {
+		name        string
+		args        []string
+		wantProject *string
+	}{
+		{
+			name:        "spaced flag",
+			args:        []string{"capture", "--quick", "--project", "  forge  ", "spaced project"},
+			wantProject: stringPointer("forge"),
+		},
+		{
+			name:        "equals flag",
+			args:        []string{"capture", "--quick", "--project=forge", "equals project"},
+			wantProject: stringPointer("forge"),
+		},
+		{
+			name:        "empty project",
+			args:        []string{"capture", "--quick", "--project=  ", "empty project"},
+			wantProject: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+			var stdout bytes.Buffer
+			err := Run(
+				context.Background(),
+				tt.args,
+				quickCaptureRuntime(dataDirectory, &stdout),
+				"dev",
+			)
+			if err != nil {
+				t.Fatalf("Run() error = %v", err)
+			}
+
+			record := readQuickCapture(t, dataDirectory)
+			if tt.wantProject == nil {
+				if record.Project != nil {
+					t.Errorf("stored project = %q, want nil", *record.Project)
+				}
+			} else if record.Project == nil || *record.Project != *tt.wantProject {
+				t.Errorf("stored project = %v, want %q", record.Project, *tt.wantProject)
+			}
+		})
+	}
+}
+
 func TestQuickCaptureUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -251,7 +299,8 @@ func TestQuickCaptureUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 		{name: "interactive not implemented", args: []string{"capture", "description"}, wantErr: "capture currently requires --quick"},
 		{name: "missing kind", args: []string{"capture", "--quick", "--kind"}, wantErr: `--kind requires a value`},
 		{name: "empty kind", args: []string{"capture", "--quick", "--kind=", "description"}, wantErr: `--kind requires a value`},
-		{name: "unknown flag", args: []string{"capture", "--quick", "--project", "forge", "description"}, wantErr: `unknown argument "--project"`},
+		{name: "missing project", args: []string{"capture", "--quick", "--project"}, wantErr: `--project requires a value`},
+		{name: "unknown flag", args: []string{"capture", "--quick", "--tags", "forge", "description"}, wantErr: `unknown argument "--tags"`},
 		{name: "extra description", args: []string{"capture", "--quick", "one", "two"}, wantErr: `unexpected argument "two"`},
 	}
 	for _, tt := range tests {
@@ -327,6 +376,37 @@ func quickCaptureRuntime(dataDirectory string, stdout *bytes.Buffer) Runtime {
 		GOOS:   runtime.GOOS,
 		EUID:   os.Geteuid(),
 	}
+}
+
+func readQuickCapture(t *testing.T, dataDirectory string) domain.Record {
+	t.Helper()
+	session, err := storage.OpenExisting(
+		context.Background(),
+		filepath.Join(dataDirectory, "forge.db"),
+		os.Geteuid(),
+		storage.DatabaseReadOnly,
+	)
+	if err != nil {
+		t.Fatalf("OpenExisting() error = %v", err)
+	}
+	repo, err := repository.New(session.Database())
+	if err != nil {
+		_ = session.Close()
+		t.Fatalf("repository.New() error = %v", err)
+	}
+	record, err := repo.FindByID(context.Background(), domain.ID("cap_00000000000000000000000000000000"))
+	closeErr := session.Close()
+	if err != nil {
+		t.Fatalf("FindByID() error = %v", err)
+	}
+	if closeErr != nil {
+		t.Fatalf("Session.Close() error = %v", closeErr)
+	}
+	return record
+}
+
+func stringPointer(value string) *string {
+	return &value
 }
 
 func argumentName(args []string) string {

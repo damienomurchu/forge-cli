@@ -350,7 +350,8 @@ Current implementation status:
   description, applies the `thought` default, and persists through the complete
   secure-storage lifecycle with human confirmation. Capture-specific help is
   implemented as a data-free path with stable golden output. Quick capture also
-  accepts an explicit kind using either supported long-flag syntax.
+  accepts explicit kind and optional normalized project values using either
+  supported long-flag syntax.
 - Phases 6 through 8 remain planned and unimplemented.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.

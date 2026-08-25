@@ -38,12 +38,13 @@ Flags:
 const captureHelp = `Capture a thought, idea, or observation.
 
 Usage:
-  forge capture --quick [--kind KIND] DESCRIPTION
+  forge capture --quick [--project PROJECT] [--kind KIND] DESCRIPTION
 
 Flags:
-  -h, --help       Show help
-      --kind KIND  Set capture kind (default: thought)
-      --quick      Capture without prompting (currently required)
+  -h, --help             Show help
+      --kind KIND        Set capture kind (default: thought)
+      --project PROJECT  Associate the capture with a project
+      --quick            Capture without prompting (currently required)
 `
 
 // Runtime contains process facilities used by the CLI. Keeping them explicit
@@ -105,6 +106,7 @@ func runCapture(ctx context.Context, args []string, rt Runtime) error {
 	}
 	record, err := domain.NewCapture(domain.CaptureInput{
 		Description: options.description,
+		Project:     options.project,
 		Kind:        options.kind,
 	}, rt.Now(), rt.Random)
 	if err != nil {
@@ -149,6 +151,7 @@ func captureHelpRequested(args []string) bool {
 
 type quickCaptureOptions struct {
 	description string
+	project     string
 	kind        domain.CaptureKind
 }
 
@@ -157,6 +160,7 @@ func parseQuickCapture(args []string) (quickCaptureOptions, error) {
 	optionsEnded := false
 	positionals := make([]string, 0, 1)
 	kind := domain.CaptureKindThought
+	project := ""
 	for index := 0; index < len(args); index++ {
 		arg := args[index]
 		switch {
@@ -184,6 +188,14 @@ func parseQuickCapture(args []string) (quickCaptureOptions, error) {
 				return quickCaptureOptions{}, err
 			}
 			kind = parsed
+		case !optionsEnded && arg == "--project":
+			if index+1 >= len(args) || strings.HasPrefix(args[index+1], "-") {
+				return quickCaptureOptions{}, &UsageError{Message: "--project requires a value"}
+			}
+			index++
+			project = args[index]
+		case !optionsEnded && strings.HasPrefix(arg, "--project="):
+			project = strings.TrimPrefix(arg, "--project=")
 		case !optionsEnded && len(arg) > 0 && arg[0] == '-':
 			return quickCaptureOptions{}, &UsageError{Argument: arg}
 		default:
@@ -199,7 +211,11 @@ func parseQuickCapture(args []string) (quickCaptureOptions, error) {
 	if !quick {
 		return quickCaptureOptions{}, &UsageError{Message: "capture currently requires --quick"}
 	}
-	return quickCaptureOptions{description: positionals[0], kind: kind}, nil
+	return quickCaptureOptions{
+		description: positionals[0],
+		project:     project,
+		kind:        kind,
+	}, nil
 }
 
 // WriteError writes a concise user-facing error and returns its exit status.
