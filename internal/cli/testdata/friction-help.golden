@@ -1,0 +1,13 @@
+Record recurring friction.
+
+Usage:
+  forge friction --quick DESCRIPTION
+
+Defaults in quick mode:
+  frequency  unknown
+  impact     unknown
+  category   other
+
+Flags:
+  -h, --help    Show help
+      --quick   Record without prompting (currently required)

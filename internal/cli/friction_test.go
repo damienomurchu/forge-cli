@@ -14,6 +14,46 @@ import (
 	"github.com/damienomurchu/forge-cli/internal/storage"
 )
 
+func TestFrictionHelp(t *testing.T) {
+	want, err := os.ReadFile(filepath.Join("testdata", "friction-help.golden"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, args := range [][]string{
+		{"friction", "-h"},
+		{"friction", "--help"},
+		{"friction", "--quick", "--unknown", "--help"},
+	} {
+		t.Run(strings.Join(args[1:], " "), func(t *testing.T) {
+			var stdout bytes.Buffer
+			rt := Runtime{
+				Stdout: &stdout,
+				Env: func(string) string {
+					t.Fatal("friction help inspected the environment")
+					return ""
+				},
+			}
+			if err := Run(context.Background(), args, rt, "dev"); err != nil {
+				t.Fatalf("Run() error = %v", err)
+			}
+			if got := stdout.String(); got != string(want) {
+				t.Errorf("friction help mismatch\ngot:\n%s\nwant:\n%s", got, want)
+			}
+		})
+	}
+}
+
+func TestFrictionHelpAfterOptionTerminatorIsDescription(t *testing.T) {
+	description, err := parseQuickFriction([]string{"--quick", "--", "--help"})
+	if err != nil {
+		t.Fatalf("parseQuickFriction() error = %v", err)
+	}
+	if description != "--help" {
+		t.Errorf("description = %q, want --help", description)
+	}
+}
+
 func TestQuickFrictionCreatesRecordWithDefaults(t *testing.T) {
 	dataDirectory := filepath.Join(t.TempDir(), "forge-data")
 	var stdout bytes.Buffer

@@ -51,6 +51,21 @@ Flags:
       --json             Write the created record as JSON
 `
 
+const frictionHelp = `Record recurring friction.
+
+Usage:
+  forge friction --quick DESCRIPTION
+
+Defaults in quick mode:
+  frequency  unknown
+  impact     unknown
+  category   other
+
+Flags:
+  -h, --help    Show help
+      --quick   Record without prompting (currently required)
+`
+
 // Runtime contains process facilities used by the CLI. Keeping them explicit
 // makes command behavior deterministic in tests and keeps global process state
 // out of application code.
@@ -102,6 +117,10 @@ func Run(ctx context.Context, args []string, rt Runtime, version string) error {
 }
 
 func runFriction(ctx context.Context, args []string, rt Runtime) error {
+	if commandHelpRequested(args) {
+		_, err := io.WriteString(rt.Stdout, frictionHelp)
+		return err
+	}
 	description, err := parseQuickFriction(args)
 	if err != nil {
 		return err
@@ -169,7 +188,7 @@ func parseQuickFriction(args []string) (string, error) {
 }
 
 func runCapture(ctx context.Context, args []string, rt Runtime) error {
-	if captureHelpRequested(args) {
+	if commandHelpRequested(args) {
 		_, err := io.WriteString(rt.Stdout, captureHelp)
 		return err
 	}
@@ -221,7 +240,7 @@ func runCapture(ctx context.Context, args []string, rt Runtime) error {
 	return nil
 }
 
-func captureHelpRequested(args []string) bool {
+func commandHelpRequested(args []string) bool {
 	for _, arg := range args {
 		if arg == "--" {
 			return false
