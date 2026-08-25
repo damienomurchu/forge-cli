@@ -39,8 +39,8 @@ data-backed command slices:
 | `forge friction --quick [--project PROJECT] [--frequency FREQUENCY] [--impact IMPACT] [--category CATEGORY] [--current-workaround TEXT] [--json] DESCRIPTION` | Implemented |
 | Other `forge friction` options and interactive mode | Planned |
 | `forge list -h`, `forge list --help` | Implemented |
-| `forge list [--json]` without filters | Implemented |
-| `forge list` filters | Planned |
+| `forge list [--type TYPE] [--json]` | Implemented |
+| Other `forge list` filters | Planned |
 | `forge show` | Planned |
 | `forge update` | Planned |
 | `forge review` | Planned |

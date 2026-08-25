@@ -122,10 +122,74 @@ func TestListJSONWritesCompleteRecordsNewestFirst(t *testing.T) {
 	}
 }
 
+func TestListFiltersByRecordType(t *testing.T) {
+	dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+	createListRecords(t, dataDirectory)
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "spaced human",
+			args: []string{"list", "--type", "capture"},
+			want: "cap_00000000000000000000000000000000  capture  captured  Older capture\n",
+		},
+		{
+			name: "equals JSON",
+			args: []string{"list", "--type=friction", "--json"},
+			want: "[{\"id\":\"frc_00000000000000000000000000000000\",\"type\":\"friction\",\"description\":\"Newer friction\",\"project\":null,\"status\":\"captured\",\"details\":{\"frequency\":\"unknown\",\"impact\":\"unknown\",\"category\":\"other\",\"current_workaround\":null},\"created_at\":\"2026-08-25T12:00:00.000000Z\",\"updated_at\":\"2026-08-25T12:00:00.000000Z\"}]\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			if err := Run(
+				context.Background(),
+				tt.args,
+				quickCaptureRuntime(dataDirectory, &stdout),
+				"dev",
+			); err != nil {
+				t.Fatalf("Run() error = %v", err)
+			}
+			if got := stdout.String(); got != tt.want {
+				t.Errorf("stdout = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestListTypeFilterWithNoMatchesWritesEmptyJSONArray(t *testing.T) {
+	dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+	if err := Run(
+		context.Background(),
+		[]string{"capture", "--quick", "Only capture"},
+		quickCaptureRuntime(dataDirectory, &bytes.Buffer{}),
+		"dev",
+	); err != nil {
+		t.Fatalf("create capture error = %v", err)
+	}
+
+	var stdout bytes.Buffer
+	if err := Run(
+		context.Background(),
+		[]string{"list", "--type", "friction", "--json"},
+		quickCaptureRuntime(dataDirectory, &stdout),
+		"dev",
+	); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if got, want := stdout.String(), "[]\n"; got != want {
+		t.Errorf("stdout = %q, want %q", got, want)
+	}
+}
+
 func TestListUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 	for _, args := range [][]string{
 		{"list", "extra"},
 		{"list", "--unknown"},
+		{"list", "--type"},
+		{"list", "--type="},
 	} {
 		t.Run(args[1], func(t *testing.T) {
 			rt := quickCaptureRuntime(t.TempDir(), &bytes.Buffer{})
@@ -139,6 +203,22 @@ func TestListUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 				t.Fatalf("Run() error = %T %v, want *UsageError", err, err)
 			}
 		})
+	}
+}
+
+func TestListInvalidTypeDoesNotInspectEnvironment(t *testing.T) {
+	var stdout bytes.Buffer
+	rt := quickCaptureRuntime(t.TempDir(), &stdout)
+	rt.Env = func(string) string {
+		t.Fatal("invalid list type inspected environment")
+		return ""
+	}
+	err := Run(context.Background(), []string{"list", "--type", "task"}, rt, "dev")
+	if err == nil || err.Error() != `invalid record type "task"` {
+		t.Fatalf("Run() error = %v, want invalid-record-type error", err)
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("stdout = %q, want empty", stdout.String())
 	}
 }
 

@@ -77,7 +77,7 @@ Flags:
 const listHelp = `List records newest first.
 
 Usage:
-  forge list [--json]
+  forge list [--type TYPE] [--json]
 
 Output:
   <id>  <type>  <status>  <description>
@@ -85,8 +85,9 @@ Output:
 Missing storage and empty results produce no output and succeed.
 
 Flags:
-  -h, --help  Show help
-      --json   Write records as a JSON array
+  -h, --help    Show help
+      --json     Write records as a JSON array
+      --type TYPE  Filter by capture or friction
 `
 
 // Runtime contains process facilities used by the CLI. Keeping them explicit
@@ -146,7 +147,7 @@ func runList(ctx context.Context, args []string, rt Runtime) error {
 		_, err := io.WriteString(rt.Stdout, listHelp)
 		return err
 	}
-	jsonOutput, err := parseList(args)
+	options, err := parseList(args)
 	if err != nil {
 		return err
 	}
@@ -156,7 +157,7 @@ func runList(ctx context.Context, args []string, rt Runtime) error {
 	}
 	session, err := storage.OpenExisting(ctx, databasePath, rt.EUID, storage.DatabaseReadOnly)
 	if errors.Is(err, storage.ErrStorageNotFound) {
-		if err := writeListResult(rt.Stdout, nil, jsonOutput); err != nil {
+		if err := writeListResult(rt.Stdout, nil, options.json); err != nil {
 			return fmt.Errorf("write list result: %w", err)
 		}
 		return nil
@@ -168,29 +169,56 @@ func runList(ctx context.Context, args []string, rt Runtime) error {
 	if err != nil {
 		return errors.Join(err, session.Close())
 	}
-	records, err := repo.List(ctx, repository.ListOptions{})
+	records, err := repo.List(ctx, options.filters)
 	if err != nil {
 		return errors.Join(err, session.Close())
 	}
 	if err := session.Close(); err != nil {
 		return fmt.Errorf("close storage after list: %w", err)
 	}
-	if err := writeListResult(rt.Stdout, records, jsonOutput); err != nil {
+	if err := writeListResult(rt.Stdout, records, options.json); err != nil {
 		return fmt.Errorf("write list result: %w", err)
 	}
 	return nil
 }
 
-func parseList(args []string) (bool, error) {
-	jsonOutput := false
-	for _, arg := range args {
-		if arg == "--json" {
-			jsonOutput = true
-			continue
+type listCommandOptions struct {
+	filters repository.ListOptions
+	json    bool
+}
+
+func parseList(args []string) (listCommandOptions, error) {
+	options := listCommandOptions{}
+	for index := 0; index < len(args); index++ {
+		arg := args[index]
+		switch {
+		case arg == "--json":
+			options.json = true
+		case arg == "--type":
+			if index+1 >= len(args) || strings.HasPrefix(args[index+1], "-") {
+				return listCommandOptions{}, &UsageError{Message: "--type requires a value"}
+			}
+			index++
+			recordType, err := domain.ParseRecordType(args[index])
+			if err != nil {
+				return listCommandOptions{}, err
+			}
+			options.filters.Type = &recordType
+		case strings.HasPrefix(arg, "--type="):
+			value := strings.TrimPrefix(arg, "--type=")
+			if value == "" {
+				return listCommandOptions{}, &UsageError{Message: "--type requires a value"}
+			}
+			recordType, err := domain.ParseRecordType(value)
+			if err != nil {
+				return listCommandOptions{}, err
+			}
+			options.filters.Type = &recordType
+		default:
+			return listCommandOptions{}, &UsageError{Argument: arg}
 		}
-		return false, &UsageError{Argument: arg}
 	}
-	return jsonOutput, nil
+	return options, nil
 }
 
 func writeListResult(w io.Writer, records []domain.Record, jsonOutput bool) error {
