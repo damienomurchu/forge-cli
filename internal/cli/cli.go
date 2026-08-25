@@ -57,7 +57,7 @@ Flags:
 const frictionHelp = `Record recurring friction.
 
 Usage:
-  forge friction --quick [--project PROJECT] [--frequency FREQUENCY]
+  forge friction [--quick] [--project PROJECT] [--frequency FREQUENCY]
                  [--impact IMPACT] [--category CATEGORY]
                  [--current-workaround TEXT] [--json] DESCRIPTION
 
@@ -74,7 +74,7 @@ Flags:
       --impact IMPACT            Set severity (default: unknown)
       --json                     Write the created record as JSON
       --project PROJECT          Associate the friction with a project
-      --quick                    Record without prompting (currently required)
+      --quick                    Record without prompting
 `
 
 const listHelp = `List records newest first.
@@ -669,6 +669,31 @@ func runFriction(ctx context.Context, args []string, rt Runtime) error {
 	if err != nil {
 		return err
 	}
+	if !options.quick {
+		if _, err := domain.NormalizeDescription(options.description); err != nil {
+			return err
+		}
+		if !options.frequencySet || !options.impactSet || !options.categorySet {
+			return &UsageError{Message: "interactive friction currently requires explicit frequency, impact, and category"}
+		}
+		if rt.IsTTY == nil || !rt.IsTTY() {
+			return &domain.InvalidValueError{Field: "interaction", Value: "stdin is not a terminal"}
+		}
+		if rt.Prompt == nil {
+			return errors.New("friction prompt is not configured")
+		}
+		prompt := rt.Prompt()
+		if prompt == nil {
+			return errors.New("friction prompt is not configured")
+		}
+		confirmed, err := prompt.Confirm(ctx, "Create friction?", true)
+		if err != nil {
+			return frictionPromptError("confirm", err)
+		}
+		if !confirmed {
+			return nil
+		}
+	}
 	record, err := domain.NewFriction(domain.FrictionInput{
 		Description:       options.description,
 		Project:           options.project,
@@ -723,6 +748,10 @@ type quickFrictionOptions struct {
 	category          domain.Category
 	currentWorkaround string
 	json              bool
+	quick             bool
+	frequencySet      bool
+	impactSet         bool
+	categorySet       bool
 }
 
 func parseQuickFriction(args []string) (quickFrictionOptions, error) {
@@ -730,8 +759,11 @@ func parseQuickFriction(args []string) (quickFrictionOptions, error) {
 	optionsEnded := false
 	positionals := make([]string, 0, 1)
 	frequency := domain.FrequencyUnknown
+	frequencySet := false
 	impact := domain.ImpactUnknown
+	impactSet := false
 	category := domain.CategoryOther
+	categorySet := false
 	project := ""
 	currentWorkaround := ""
 	jsonOutput := false
@@ -754,6 +786,7 @@ func parseQuickFriction(args []string) (quickFrictionOptions, error) {
 				return quickFrictionOptions{}, err
 			}
 			frequency = parsed
+			frequencySet = true
 		case !optionsEnded && strings.HasPrefix(arg, "--frequency="):
 			value := strings.TrimPrefix(arg, "--frequency=")
 			if value == "" {
@@ -764,6 +797,7 @@ func parseQuickFriction(args []string) (quickFrictionOptions, error) {
 				return quickFrictionOptions{}, err
 			}
 			frequency = parsed
+			frequencySet = true
 		case !optionsEnded && arg == "--impact":
 			if index+1 >= len(args) || strings.HasPrefix(args[index+1], "-") {
 				return quickFrictionOptions{}, &UsageError{Message: "--impact requires a value"}
@@ -774,6 +808,7 @@ func parseQuickFriction(args []string) (quickFrictionOptions, error) {
 				return quickFrictionOptions{}, err
 			}
 			impact = parsed
+			impactSet = true
 		case !optionsEnded && strings.HasPrefix(arg, "--impact="):
 			value := strings.TrimPrefix(arg, "--impact=")
 			if value == "" {
@@ -784,6 +819,7 @@ func parseQuickFriction(args []string) (quickFrictionOptions, error) {
 				return quickFrictionOptions{}, err
 			}
 			impact = parsed
+			impactSet = true
 		case !optionsEnded && arg == "--category":
 			if index+1 >= len(args) || strings.HasPrefix(args[index+1], "-") {
 				return quickFrictionOptions{}, &UsageError{Message: "--category requires a value"}
@@ -794,6 +830,7 @@ func parseQuickFriction(args []string) (quickFrictionOptions, error) {
 				return quickFrictionOptions{}, err
 			}
 			category = parsed
+			categorySet = true
 		case !optionsEnded && strings.HasPrefix(arg, "--category="):
 			value := strings.TrimPrefix(arg, "--category=")
 			if value == "" {
@@ -804,6 +841,7 @@ func parseQuickFriction(args []string) (quickFrictionOptions, error) {
 				return quickFrictionOptions{}, err
 			}
 			category = parsed
+			categorySet = true
 		case !optionsEnded && arg == "--project":
 			if index+1 >= len(args) || strings.HasPrefix(args[index+1], "-") {
 				return quickFrictionOptions{}, &UsageError{Message: "--project requires a value"}
@@ -832,9 +870,6 @@ func parseQuickFriction(args []string) (quickFrictionOptions, error) {
 	if len(positionals) > 1 {
 		return quickFrictionOptions{}, &UsageError{Message: fmt.Sprintf("unexpected argument %q", positionals[1])}
 	}
-	if !quick {
-		return quickFrictionOptions{}, &UsageError{Message: "friction currently requires --quick"}
-	}
 	return quickFrictionOptions{
 		description:       positionals[0],
 		project:           project,
@@ -843,7 +878,18 @@ func parseQuickFriction(args []string) (quickFrictionOptions, error) {
 		category:          category,
 		currentWorkaround: currentWorkaround,
 		json:              jsonOutput,
+		quick:             quick,
+		frequencySet:      frequencySet,
+		impactSet:         impactSet,
+		categorySet:       categorySet,
 	}, nil
+}
+
+func frictionPromptError(action string, err error) error {
+	if errors.Is(err, promptui.ErrCancelled) {
+		return &InterruptedError{Message: "friction cancelled", Cause: err}
+	}
+	return fmt.Errorf("%s friction: %w", action, err)
 }
 
 func runCapture(ctx context.Context, args []string, rt Runtime) error {

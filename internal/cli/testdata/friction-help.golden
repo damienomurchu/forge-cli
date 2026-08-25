@@ -1,7 +1,7 @@
 Record recurring friction.
 
 Usage:
-  forge friction --quick [--project PROJECT] [--frequency FREQUENCY]
+  forge friction [--quick] [--project PROJECT] [--frequency FREQUENCY]
                  [--impact IMPACT] [--category CATEGORY]
                  [--current-workaround TEXT] [--json] DESCRIPTION
 
@@ -18,4 +18,4 @@ Flags:
       --impact IMPACT            Set severity (default: unknown)
       --json                     Write the created record as JSON
       --project PROJECT          Associate the friction with a project
-      --quick                    Record without prompting (currently required)
+      --quick                    Record without prompting

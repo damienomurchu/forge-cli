@@ -383,7 +383,9 @@ Current implementation status:
   explicit kind skips selection but still requires confirmation. Acceptance
   persists normally, decline writes nothing, and cancellation during either
   prompt exits as an interruption. This completes the interactive capture
-  contract.
+  contract. Non-quick friction with all three classifications supplied explicitly
+  now requires confirmation before persistence; omitted classification prompts
+  remain to be implemented.
 - Phases 7 and 8 remain planned and unimplemented.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.

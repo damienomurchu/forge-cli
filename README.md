@@ -36,8 +36,8 @@ data-backed command slices:
 | `forge capture --quick [--project PROJECT] [--kind KIND] [--tags TAGS] [--json] DESCRIPTION` | Implemented |
 | Other `forge capture` options and interactive mode | Planned |
 | `forge friction -h`, `forge friction --help` | Implemented |
-| `forge friction --quick [--project PROJECT] [--frequency FREQUENCY] [--impact IMPACT] [--category CATEGORY] [--current-workaround TEXT] [--json] DESCRIPTION` | Implemented |
-| Other `forge friction` options and interactive mode | Planned |
+| `forge friction [--quick] [--project PROJECT] [--frequency FREQUENCY] [--impact IMPACT] [--category CATEGORY] [--current-workaround TEXT] [--json] DESCRIPTION` | Interactive confirmation implemented; omitted classification prompts pending |
+| Interactive friction classification prompts | Planned |
 | `forge list -h`, `forge list --help` | Implemented |
 | `forge list [--type TYPE] [--json]` | Implemented |
 | Other `forge list` filters | Planned |

@@ -306,7 +306,7 @@ func TestQuickFrictionUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 		wantErr string
 	}{
 		{name: "missing description", args: []string{"friction", "--quick"}, wantErr: "friction requires a description"},
-		{name: "interactive not implemented", args: []string{"friction", "description"}, wantErr: "friction currently requires --quick"},
+		{name: "interactive classifications omitted", args: []string{"friction", "description"}, wantErr: "interactive friction currently requires explicit frequency, impact, and category"},
 		{name: "missing frequency", args: []string{"friction", "--quick", "--frequency"}, wantErr: `--frequency requires a value`},
 		{name: "empty frequency", args: []string{"friction", "--quick", "--frequency=", "description"}, wantErr: `--frequency requires a value`},
 		{name: "missing impact", args: []string{"friction", "--quick", "--impact"}, wantErr: `--impact requires a value`},
