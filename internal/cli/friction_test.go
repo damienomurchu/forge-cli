@@ -172,6 +172,54 @@ func TestQuickFrictionPersistsExplicitCategory(t *testing.T) {
 	}
 }
 
+func TestQuickFrictionNormalizesAndPersistsProject(t *testing.T) {
+	tests := []struct {
+		name        string
+		args        []string
+		wantProject *string
+	}{
+		{
+			name:        "spaced flag",
+			args:        []string{"friction", "--quick", "--project", "  forge  ", "spaced project"},
+			wantProject: stringPointer("forge"),
+		},
+		{
+			name:        "equals flag",
+			args:        []string{"friction", "--quick", "--project=forge", "equals project"},
+			wantProject: stringPointer("forge"),
+		},
+		{
+			name:        "empty project",
+			args:        []string{"friction", "--quick", "--project=  ", "empty project"},
+			wantProject: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+			var stdout bytes.Buffer
+			err := Run(
+				context.Background(),
+				tt.args,
+				quickCaptureRuntime(dataDirectory, &stdout),
+				"dev",
+			)
+			if err != nil {
+				t.Fatalf("Run() error = %v", err)
+			}
+
+			record := readQuickFriction(t, dataDirectory)
+			if tt.wantProject == nil {
+				if record.Project != nil {
+					t.Errorf("stored project = %q, want nil", *record.Project)
+				}
+			} else if record.Project == nil || *record.Project != *tt.wantProject {
+				t.Errorf("stored project = %v, want %q", record.Project, *tt.wantProject)
+			}
+		})
+	}
+}
+
 func TestQuickFrictionUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -186,7 +234,8 @@ func TestQuickFrictionUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 		{name: "empty impact", args: []string{"friction", "--quick", "--impact=", "description"}, wantErr: `--impact requires a value`},
 		{name: "missing category", args: []string{"friction", "--quick", "--category"}, wantErr: `--category requires a value`},
 		{name: "empty category", args: []string{"friction", "--quick", "--category=", "description"}, wantErr: `--category requires a value`},
-		{name: "unknown flag", args: []string{"friction", "--quick", "--project", "forge", "description"}, wantErr: `unknown argument "--project"`},
+		{name: "missing project", args: []string{"friction", "--quick", "--project"}, wantErr: `--project requires a value`},
+		{name: "unknown flag", args: []string{"friction", "--quick", "--current-workaround", "manual", "description"}, wantErr: `unknown argument "--current-workaround"`},
 		{name: "extra description", args: []string{"friction", "--quick", "one", "two"}, wantErr: `unexpected argument "two"`},
 	}
 	for _, tt := range tests {
