@@ -77,7 +77,7 @@ forge list [--limit N] [--type TYPE] [--project PROJECT] [--status STATUS]
            [--json]
 forge show RECORD_ID [--json]
 forge update [--json] RECORD_ID --status STATUS
-forge review [friction] [--json]
+forge review [--json]
 ```
 
 Before implementing each command group, confirm that its names, flags, defaults,
