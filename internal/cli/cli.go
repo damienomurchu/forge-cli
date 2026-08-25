@@ -74,6 +74,20 @@ Flags:
       --quick                    Record without prompting (currently required)
 `
 
+const listHelp = `List records newest first.
+
+Usage:
+  forge list
+
+Output:
+  <id>  <type>  <status>  <description>
+
+Missing storage and empty results produce no output and succeed.
+
+Flags:
+  -h, --help  Show help
+`
+
 // Runtime contains process facilities used by the CLI. Keeping them explicit
 // makes command behavior deterministic in tests and keeps global process state
 // out of application code.
@@ -127,6 +141,10 @@ func Run(ctx context.Context, args []string, rt Runtime, version string) error {
 }
 
 func runList(ctx context.Context, args []string, rt Runtime) error {
+	if commandHelpRequested(args) {
+		_, err := io.WriteString(rt.Stdout, listHelp)
+		return err
+	}
 	if len(args) != 0 {
 		return &UsageError{Argument: args[0]}
 	}

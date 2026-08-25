@@ -13,6 +13,36 @@ import (
 	"github.com/damienomurchu/forge-cli/internal/storage"
 )
 
+func TestListHelp(t *testing.T) {
+	want, err := os.ReadFile(filepath.Join("testdata", "list-help.golden"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, args := range [][]string{
+		{"list", "-h"},
+		{"list", "--help"},
+		{"list", "--unknown", "--help"},
+	} {
+		t.Run(strings.Join(args[1:], " "), func(t *testing.T) {
+			var stdout bytes.Buffer
+			rt := Runtime{
+				Stdout: &stdout,
+				Env: func(string) string {
+					t.Fatal("list help inspected the environment")
+					return ""
+				},
+			}
+			if err := Run(context.Background(), args, rt, "dev"); err != nil {
+				t.Fatalf("Run() error = %v", err)
+			}
+			if got := stdout.String(); got != string(want) {
+				t.Errorf("list help mismatch\ngot:\n%s\nwant:\n%s", got, want)
+			}
+		})
+	}
+}
+
 func TestListMissingStorageIsSuccessfulAndEmpty(t *testing.T) {
 	dataDirectory := filepath.Join(t.TempDir(), "missing")
 	var stdout bytes.Buffer

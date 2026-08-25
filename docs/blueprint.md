@@ -361,7 +361,8 @@ Current implementation status:
   supported long-flag syntax, plus optional normalized project and current
   workaround values. It supports exclusive, newline-terminated record JSON output.
   Unfiltered human listing is implemented newest-first using strictly read-only
-  storage, with missing storage represented by successful empty output.
+  storage, with missing storage represented by successful empty output. List help
+  is implemented as a data-free path with stable golden output.
 - Phases 6 through 8 remain planned and unimplemented.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.
