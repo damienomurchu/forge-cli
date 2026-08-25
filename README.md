@@ -16,7 +16,8 @@ The architecture, phased plan, and acceptance criteria are in
 [friction contract](docs/friction-contract.md), [list contract](docs/list-contract.md),
 [show contract](docs/show-contract.md), [update contract](docs/update-contract.md), and
 [review contract](docs/review-contract.md). The shared domain and JSON schema are in
-the [record contract](docs/record-contract.md).
+the [record contract](docs/record-contract.md), and persistence is defined by the
+[storage contract](docs/storage-contract.md).
 
 ## Targets
 

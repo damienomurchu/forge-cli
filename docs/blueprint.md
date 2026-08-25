@@ -146,27 +146,11 @@ status: captured
 
 ## Storage design
 
-Use SQLite for local persistence. The initial Go schema may reuse good ideas from
-the archived project, but it belongs to this project and should support its future.
-
-Proposed starting point:
-
-```sql
-CREATE TABLE records (
-    id TEXT PRIMARY KEY,
-    type TEXT NOT NULL,
-    description TEXT NOT NULL,
-    project TEXT,
-    status TEXT NOT NULL DEFAULT 'captured',
-    metadata TEXT NOT NULL DEFAULT '{}',
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
-```
-
-Before committing migration 001, decide whether typed columns or structured
-metadata are the better long-term model. After release, migrations are append-only
-and existing Go-created databases remain supported.
+Use SQLite for local persistence. The Go-owned schema is defined in
+`docs/storage-contract.md`: common and typed record fields live in one `records`
+table, while ordered capture tags use a normalized `record_tags` table. Opaque
+metadata JSON is not used. After release, migrations are append-only and existing
+Go-created databases remain supported.
 
 Default locations:
 
@@ -341,7 +325,7 @@ continue.
 
 - Confirm the command surface, terminology, defaults, output principles, exit-code
   categories, and JSON stability policy.
-- Decide between metadata JSON and typed columns before migration 001.
+- Validate the approved typed-column schema and indexes before migration 001.
 - Establish reproducible performance measurement using no user data.
 
 Acceptance: open decisions are explicit, intended behavior is testable, and no step
