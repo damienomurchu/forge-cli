@@ -1,0 +1,17 @@
+Forge captures ideas and friction in day-to-day work.
+
+Usage:
+  forge
+  forge [command] [flags]
+
+Commands:
+  capture    Capture a thought, idea, or observation
+  friction   Record recurring friction
+  list       List records
+  show       Show a record
+  update     Update a record
+  review     Review captured friction
+
+Flags:
+  -h, --help      Show help
+      --version   Show version

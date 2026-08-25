@@ -40,8 +40,8 @@ For example:
 forge 0.1.0
 ```
 
-Release builds inject the version at link time. Development builds use a
-deterministic fallback that is defined when the Go executable is introduced.
+Release builds inject the version at link time. Development builds use the
+deterministic fallback `dev`.
 
 ## Output streams
 

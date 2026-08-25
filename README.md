@@ -6,10 +6,11 @@ CLI's product design, not a clone of the archived Python version.
 
 ## Status
 
-The product specification and performance harness are established. Phase 1 risk
-spikes accepted initial SQLite and interactive prompt dependencies with measured
-constraints. The next milestone is Phase 2: the fast Go CLI shell for help and
-version, without database or prompt initialization.
+The product specification, performance harness, and fast Go CLI shell are
+established. Phase 1 risk spikes accepted initial SQLite and interactive prompt
+dependencies with measured constraints. Phase 2 introduced the native executable's
+help, version, and exit handling without database or prompt initialization. The
+next milestone is Phase 3: domain values, validation, and presentation.
 
 The architecture, phased plan, and acceptance criteria are in
 [the rewrite blueprint](docs/blueprint.md). Approved behavior is recorded in the
