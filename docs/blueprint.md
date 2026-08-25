@@ -360,6 +360,8 @@ Current implementation status:
   friction accepts explicit frequency, impact, and category values using either
   supported long-flag syntax, plus optional normalized project and current
   workaround values. It supports exclusive, newline-terminated record JSON output.
+  Unfiltered human listing is implemented newest-first using strictly read-only
+  storage, with missing storage represented by successful empty output.
 - Phases 6 through 8 remain planned and unimplemented.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.

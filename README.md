@@ -20,12 +20,13 @@ query is implemented, completing the planned repository surface. Secure storage
 now has distinct create-or-open and open-existing directory primitives. Owned
 storage sessions support both schema-checked access to existing databases and
 transactional creation and migration, completing Phase 4 secure storage. Phase 5
-has begun with quick capture's first end-to-end slice.
+now includes complete non-interactive capture and friction creation options plus
+unfiltered human listing.
 
 ### Command availability
 
-The current executable implements the fast, data-free CLI shell and the first
-data-backed command slice:
+The current executable implements the fast, data-free CLI shell and the following
+data-backed command slices:
 
 | Invocation | Status |
 |---|---|
@@ -37,15 +38,15 @@ data-backed command slice:
 | `forge friction -h`, `forge friction --help` | Implemented |
 | `forge friction --quick [--project PROJECT] [--frequency FREQUENCY] [--impact IMPACT] [--category CATEGORY] [--current-workaround TEXT] [--json] DESCRIPTION` | Implemented |
 | Other `forge friction` options and interactive mode | Planned |
-| `forge list` | Planned |
+| `forge list` without filters | Implemented |
+| `forge list` filters and JSON output | Planned |
 | `forge show` | Planned |
 | `forge update` | Planned |
 | `forge review` | Planned |
 
 The planned commands appear in top-level help to communicate the intended product
-surface. Non-interactive operations beyond basic quick capture, interactive
-workflows, release packaging, and product hardening remain to be implemented in
-Phases 5 through 8.
+surface. Remaining non-interactive operations, interactive workflows, release
+packaging, and product hardening remain to be implemented in Phases 5 through 8.
 
 The architecture, phased plan, and acceptance criteria are in
 [the rewrite blueprint](docs/blueprint.md). Approved behavior is recorded in the

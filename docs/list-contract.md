@@ -30,8 +30,14 @@ limits are validation failures with exit status `1`.
 ## Ordering and output
 
 Results are ordered newest first with a deterministic tie-breaker. Human mode emits
-a readable list and succeeds without special empty-state errors. Exact human layout
-will be approved with implementation goldens.
+one terminal-safe line per record, with fields separated by two spaces:
+
+```text
+<id>  <type>  <status>  <description>
+```
+
+It has no heading. An empty result succeeds and writes nothing. This initial layout
+is fixed by implementation goldens.
 
 With `--json`, the command emits one array followed by a newline, including `[]`
 when no records match. It emits no human commentary on stdout.

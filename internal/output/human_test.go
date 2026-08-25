@@ -37,6 +37,65 @@ func TestWriteCreatedMatchesGolden(t *testing.T) {
 	}
 }
 
+func TestWriteRecordListMatchesGolden(t *testing.T) {
+	want, err := os.ReadFile(filepath.Join("testdata", "list.golden"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	records := []domain.Record{frictionRecord(t), captureRecord(t)}
+
+	var got bytes.Buffer
+	if err := WriteRecordList(&got, records); err != nil {
+		t.Fatalf("WriteRecordList() error = %v", err)
+	}
+	if got.String() != string(want) {
+		t.Errorf("WriteRecordList() = %q, want %q", got.String(), want)
+	}
+}
+
+func TestWriteRecordListEscapesDescriptions(t *testing.T) {
+	record := captureRecord(t)
+	record.Description = "line one\nline two\t\u202e"
+	var got bytes.Buffer
+	if err := WriteRecordList(&got, []domain.Record{record}); err != nil {
+		t.Fatalf("WriteRecordList() error = %v", err)
+	}
+	want := record.ID.String() + "  capture  captured  line one\\nline two\\t\\u202e\n"
+	if got.String() != want {
+		t.Errorf("WriteRecordList() = %q, want %q", got.String(), want)
+	}
+}
+
+func TestWriteRecordListValidatesAllRecordsBeforeWriting(t *testing.T) {
+	invalid := frictionRecord(t)
+	invalid.Status = "invalid"
+	var got bytes.Buffer
+	err := WriteRecordList(&got, []domain.Record{captureRecord(t), invalid})
+	var invalidValue *domain.InvalidValueError
+	if !errors.As(err, &invalidValue) {
+		t.Fatalf("WriteRecordList() error = %T %v, want *domain.InvalidValueError", err, err)
+	}
+	if got.Len() != 0 {
+		t.Errorf("WriteRecordList() wrote %q before validation failed", got.String())
+	}
+}
+
+func TestWriteRecordListEmptyAndWriterFailure(t *testing.T) {
+	var empty bytes.Buffer
+	if err := WriteRecordList(&empty, nil); err != nil {
+		t.Fatalf("empty WriteRecordList() error = %v", err)
+	}
+	if empty.Len() != 0 {
+		t.Errorf("empty WriteRecordList() = %q, want empty", empty.String())
+	}
+
+	wantErr := errors.New("writer failed")
+	err := WriteRecordList(errorWriter{err: wantErr}, []domain.Record{captureRecord(t)})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("WriteRecordList() error = %v, want %v", err, wantErr)
+	}
+}
+
 func TestWriteCreatedValidatesBeforeWriting(t *testing.T) {
 	record := captureRecord(t)
 	record.ID = "invalid"

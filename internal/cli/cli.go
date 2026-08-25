@@ -119,9 +119,43 @@ func Run(ctx context.Context, args []string, rt Runtime, version string) error {
 		return runCapture(ctx, args[1:], rt)
 	case len(args) > 0 && args[0] == "friction":
 		return runFriction(ctx, args[1:], rt)
+	case len(args) > 0 && args[0] == "list":
+		return runList(ctx, args[1:], rt)
 	default:
 		return &UsageError{Argument: args[0]}
 	}
+}
+
+func runList(ctx context.Context, args []string, rt Runtime) error {
+	if len(args) != 0 {
+		return &UsageError{Argument: args[0]}
+	}
+	databasePath, err := config.ResolveDatabasePath(rt.GOOS, rt.Env)
+	if err != nil {
+		return fmt.Errorf("resolve database path: %w", err)
+	}
+	session, err := storage.OpenExisting(ctx, databasePath, rt.EUID, storage.DatabaseReadOnly)
+	if errors.Is(err, storage.ErrStorageNotFound) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("open storage for list: %w", err)
+	}
+	repo, err := repository.New(session.Database())
+	if err != nil {
+		return errors.Join(err, session.Close())
+	}
+	records, err := repo.List(ctx, repository.ListOptions{})
+	if err != nil {
+		return errors.Join(err, session.Close())
+	}
+	if err := session.Close(); err != nil {
+		return fmt.Errorf("close storage after list: %w", err)
+	}
+	if err := output.WriteRecordList(rt.Stdout, records); err != nil {
+		return fmt.Errorf("write list result: %w", err)
+	}
+	return nil
 }
 
 func runFriction(ctx context.Context, args []string, rt Runtime) error {

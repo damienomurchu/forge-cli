@@ -1,0 +1,192 @@
+package cli
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/damienomurchu/forge-cli/internal/storage"
+)
+
+func TestListMissingStorageIsSuccessfulAndEmpty(t *testing.T) {
+	dataDirectory := filepath.Join(t.TempDir(), "missing")
+	var stdout bytes.Buffer
+	err := Run(
+		context.Background(),
+		[]string{"list"},
+		quickCaptureRuntime(dataDirectory, &stdout),
+		"dev",
+	)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("stdout = %q, want empty", stdout.String())
+	}
+	if _, statErr := os.Stat(dataDirectory); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("data directory state error = %v, want not exist", statErr)
+	}
+}
+
+func TestListWritesRecordsNewestFirst(t *testing.T) {
+	dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+	createRuntime := quickCaptureRuntime(dataDirectory, &bytes.Buffer{})
+	createRuntime.Now = func() time.Time {
+		return time.Date(2026, time.August, 25, 11, 0, 0, 0, time.UTC)
+	}
+	if err := Run(
+		context.Background(),
+		[]string{"capture", "--quick", "Older capture"},
+		createRuntime,
+		"dev",
+	); err != nil {
+		t.Fatalf("create capture error = %v", err)
+	}
+	createRuntime = quickCaptureRuntime(dataDirectory, &bytes.Buffer{})
+	createRuntime.Now = func() time.Time {
+		return time.Date(2026, time.August, 25, 12, 0, 0, 0, time.UTC)
+	}
+	if err := Run(
+		context.Background(),
+		[]string{"friction", "--quick", "Newer friction"},
+		createRuntime,
+		"dev",
+	); err != nil {
+		t.Fatalf("create friction error = %v", err)
+	}
+
+	var stdout bytes.Buffer
+	if err := Run(
+		context.Background(),
+		[]string{"list"},
+		quickCaptureRuntime(dataDirectory, &stdout),
+		"dev",
+	); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	want := "frc_00000000000000000000000000000000  friction  captured  Newer friction\n" +
+		"cap_00000000000000000000000000000000  capture  captured  Older capture\n"
+	if stdout.String() != want {
+		t.Errorf("stdout = %q, want %q", stdout.String(), want)
+	}
+}
+
+func TestListUsageErrorsDoNotInspectEnvironment(t *testing.T) {
+	for _, args := range [][]string{
+		{"list", "extra"},
+		{"list", "--json"},
+	} {
+		t.Run(args[1], func(t *testing.T) {
+			rt := quickCaptureRuntime(t.TempDir(), &bytes.Buffer{})
+			rt.Env = func(string) string {
+				t.Fatal("list usage error inspected environment")
+				return ""
+			}
+			err := Run(context.Background(), args, rt, "dev")
+			var usageErr *UsageError
+			if !errors.As(err, &usageErr) {
+				t.Fatalf("Run() error = %T %v, want *UsageError", err, err)
+			}
+		})
+	}
+}
+
+func TestListRejectsIncompatibleSchemaWithoutOutput(t *testing.T) {
+	dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+	createArchivedMigrationDatabase(t, dataDirectory)
+	var stdout bytes.Buffer
+	err := Run(
+		context.Background(),
+		[]string{"list"},
+		quickCaptureRuntime(dataDirectory, &stdout),
+		"dev",
+	)
+	if !errors.Is(err, storage.ErrIncompatibleSchema) {
+		t.Fatalf("Run() error = %v, want ErrIncompatibleSchema", err)
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("stdout = %q, want empty", stdout.String())
+	}
+}
+
+func TestListRejectsMalformedRecordWithoutOutput(t *testing.T) {
+	dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+	if err := Run(
+		context.Background(),
+		[]string{"capture", "--quick", "Valid capture"},
+		quickCaptureRuntime(dataDirectory, &bytes.Buffer{}),
+		"dev",
+	); err != nil {
+		t.Fatalf("create capture error = %v", err)
+	}
+
+	session, err := storage.OpenExisting(
+		context.Background(),
+		filepath.Join(dataDirectory, "forge.db"),
+		os.Geteuid(),
+		storage.DatabaseReadWrite,
+	)
+	if err != nil {
+		t.Fatalf("OpenExisting() error = %v", err)
+	}
+	if _, err := session.Database().Exec(`UPDATE records SET description = ' malformed '`); err != nil {
+		_ = session.Close()
+		t.Fatalf("corrupt record error = %v", err)
+	}
+	if err := session.Close(); err != nil {
+		t.Fatalf("Session.Close() error = %v", err)
+	}
+
+	var stdout bytes.Buffer
+	err = Run(
+		context.Background(),
+		[]string{"list"},
+		quickCaptureRuntime(dataDirectory, &stdout),
+		"dev",
+	)
+	if err == nil || !strings.Contains(err.Error(), "invalid description") {
+		t.Fatalf("Run() error = %v, want malformed-record error", err)
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("stdout = %q, want empty", stdout.String())
+	}
+}
+
+func createArchivedMigrationDatabase(t *testing.T, dataDirectory string) {
+	t.Helper()
+	if err := os.Mkdir(dataDirectory, 0o700); err != nil {
+		t.Fatalf("create data directory error = %v", err)
+	}
+	directory, err := storage.OpenDataDirectory(dataDirectory, os.Geteuid())
+	if err != nil {
+		t.Fatalf("OpenDataDirectory() error = %v", err)
+	}
+	database, err := storage.OpenDatabaseFile(directory, storage.DatabaseCreate, os.Geteuid())
+	if err != nil {
+		_ = directory.Close()
+		t.Fatalf("OpenDatabaseFile() error = %v", err)
+	}
+	db, err := storage.OpenSQLite(context.Background(), directory, database, storage.DatabaseCreate)
+	if err != nil {
+		_ = database.Close()
+		_ = directory.Close()
+		t.Fatalf("OpenSQLite() error = %v", err)
+	}
+	if _, err := db.Exec(`CREATE TABLE schema_migrations (
+		name TEXT PRIMARY KEY,
+		applied_at TEXT NOT NULL
+	)`); err != nil {
+		_ = db.Close()
+		_ = database.Close()
+		_ = directory.Close()
+		t.Fatalf("create archived schema error = %v", err)
+	}
+	if err := errors.Join(db.Close(), database.Close(), directory.Close()); err != nil {
+		t.Fatalf("close archived database error = %v", err)
+	}
+}
