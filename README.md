@@ -6,22 +6,12 @@ CLI's product design, not a clone of the archived Python version.
 
 ## Status
 
-The product specification, performance harness, fast Go CLI shell, domain model,
-and initial presentation layer are established. Phase 3 completed the validated
-record model, deterministic JSON, and terminal-safe human output foundations.
-Phase 4 secure storage work now includes centralized database path resolution and
-secure preparation and opening of owned, private data directories and database
-files, plus single-connection SQLite setup with required pragmas. Transactional
-migration inspection and application are also implemented. Repository creation is
-implemented for both captures and friction, and lookup by record ID is implemented;
-newest-first repository listing supports type, project, status, and limit filters.
-Atomic repository status updates are also implemented. The specialized review
-query is implemented, completing the planned repository surface. Secure storage
-now has distinct create-or-open and open-existing directory primitives. Owned
-storage sessions support both schema-checked access to existing databases and
-transactional creation and migration, completing Phase 4 secure storage. Phase 5
-now includes complete non-interactive capture and friction creation options plus
-unfiltered human listing.
+Phases 0 through 5 are complete: Forge has its product contracts, performance
+harness, native Go CLI shell, validated domain and presentation layers, secure
+SQLite storage, and the complete non-interactive command surface. Phase 6 is in
+progress. Interactive capture is complete, and friction records with explicit
+frequency, impact, and category values can be confirmed interactively. Prompts for
+omitted friction classifications remain to be implemented.
 
 ### Command availability
 
@@ -33,21 +23,19 @@ data-backed command slices:
 | `forge`, `forge -h`, `forge --help` | Implemented |
 | `forge --version` | Implemented |
 | `forge capture -h`, `forge capture --help` | Implemented |
-| `forge capture --quick [--project PROJECT] [--kind KIND] [--tags TAGS] [--json] DESCRIPTION` | Implemented |
-| Other `forge capture` options and interactive mode | Planned |
+| `forge capture [--quick] [--project PROJECT] [--kind KIND] [--tags TAGS] [--json] DESCRIPTION` | Implemented |
 | `forge friction -h`, `forge friction --help` | Implemented |
-| `forge friction [--quick] [--project PROJECT] [--frequency FREQUENCY] [--impact IMPACT] [--category CATEGORY] [--current-workaround TEXT] [--json] DESCRIPTION` | Interactive confirmation implemented; omitted classification prompts pending |
-| Interactive friction classification prompts | Planned |
+| `forge friction --quick [--project PROJECT] [--frequency FREQUENCY] [--impact IMPACT] [--category CATEGORY] [--current-workaround TEXT] [--json] DESCRIPTION` | Implemented |
+| `forge friction` with explicit frequency, impact, and category | Interactive confirmation implemented |
+| `forge friction` with omitted classifications | Interactive prompts planned |
 | `forge list -h`, `forge list --help` | Implemented |
-| `forge list [--type TYPE] [--json]` | Implemented |
-| Other `forge list` filters | Planned |
-| `forge show` | Planned |
-| `forge update` | Planned |
-| `forge review` | Planned |
+| `forge list [--limit N] [--type TYPE] [--project PROJECT] [--status STATUS] [--json]` | Implemented |
+| `forge show [--json] RECORD_ID` | Implemented |
+| `forge update [--json] RECORD_ID --status STATUS` | Implemented |
+| `forge review [--json]` | Implemented |
 
-The planned commands appear in top-level help to communicate the intended product
-surface. Remaining non-interactive operations, interactive workflows, release
-packaging, and product hardening remain to be implemented in Phases 5 through 8.
+The remaining interactive friction prompts, release packaging, and product
+hardening remain to be implemented in Phases 6 through 8.
 
 The architecture, phased plan, and acceptance criteria are in
 [the rewrite blueprint](docs/blueprint.md). Approved behavior is recorded in the

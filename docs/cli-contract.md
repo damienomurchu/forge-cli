@@ -119,5 +119,5 @@ making a typing mistake has no persistent side effects.
 ## Stability
 
 The behaviors in this document are the contract for the first Go implementation.
-Exact help wording and layout will be approved with intentional golden tests when
-the fast CLI shell is implemented. They are not derived from Python 2.1.0.
+Exact help wording and layout are protected by intentional golden tests. They are
+not derived from Python 2.1.0.

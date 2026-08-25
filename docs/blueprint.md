@@ -346,7 +346,7 @@ Current implementation status:
   now distinguishes create-or-open from open-existing directory access. Owned
   storage sessions support both schema-checked access to existing databases and
   transactional creation and migration.
-- Phase 5 is in progress. The first quick-capture slice accepts `--quick` and one
+- Phase 5 is complete. The first quick-capture slice accepts `--quick` and one
   description, applies the `thought` default, and persists through the complete
   secure-storage lifecycle with human confirmation. Capture-specific help is
   implemented as a data-free path with stable golden output. Quick capture also
