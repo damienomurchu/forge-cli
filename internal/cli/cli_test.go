@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -289,6 +290,50 @@ func TestQuickCaptureNormalizesAndPersistsProject(t *testing.T) {
 	}
 }
 
+func TestQuickCaptureNormalizesAndPersistsTags(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		wantTags []string
+	}{
+		{
+			name:     "spaced flag",
+			args:     []string{"capture", "--quick", "--tags", " Go, performance,go,, CLI ", "spaced tags"},
+			wantTags: []string{"go", "performance", "cli"},
+		},
+		{
+			name:     "equals flag",
+			args:     []string{"capture", "--quick", "--tags=Go,CLI", "equals tags"},
+			wantTags: []string{"go", "cli"},
+		},
+		{
+			name:     "empty tags",
+			args:     []string{"capture", "--quick", "--tags= , ", "empty tags"},
+			wantTags: []string{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+			var stdout bytes.Buffer
+			err := Run(
+				context.Background(),
+				tt.args,
+				quickCaptureRuntime(dataDirectory, &stdout),
+				"dev",
+			)
+			if err != nil {
+				t.Fatalf("Run() error = %v", err)
+			}
+
+			record := readQuickCapture(t, dataDirectory)
+			if got := record.Details.Capture.Tags; !slices.Equal(got, tt.wantTags) {
+				t.Errorf("stored tags = %#v, want %#v", got, tt.wantTags)
+			}
+		})
+	}
+}
+
 func TestQuickCaptureUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -300,7 +345,8 @@ func TestQuickCaptureUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 		{name: "missing kind", args: []string{"capture", "--quick", "--kind"}, wantErr: `--kind requires a value`},
 		{name: "empty kind", args: []string{"capture", "--quick", "--kind=", "description"}, wantErr: `--kind requires a value`},
 		{name: "missing project", args: []string{"capture", "--quick", "--project"}, wantErr: `--project requires a value`},
-		{name: "unknown flag", args: []string{"capture", "--quick", "--tags", "forge", "description"}, wantErr: `unknown argument "--tags"`},
+		{name: "missing tags", args: []string{"capture", "--quick", "--tags"}, wantErr: `--tags requires a value`},
+		{name: "unknown flag", args: []string{"capture", "--quick", "--json", "description"}, wantErr: `unknown argument "--json"`},
 		{name: "extra description", args: []string{"capture", "--quick", "one", "two"}, wantErr: `unexpected argument "two"`},
 	}
 	for _, tt := range tests {

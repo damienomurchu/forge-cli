@@ -1,10 +1,12 @@
 Capture a thought, idea, or observation.
 
 Usage:
-  forge capture --quick [--project PROJECT] [--kind KIND] DESCRIPTION
+  forge capture --quick [--project PROJECT] [--kind KIND]
+                [--tags TAGS] DESCRIPTION
 
 Flags:
   -h, --help             Show help
       --kind KIND        Set capture kind (default: thought)
       --project PROJECT  Associate the capture with a project
       --quick            Capture without prompting (currently required)
+      --tags TAGS        Add comma-separated tags

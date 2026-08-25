@@ -38,13 +38,15 @@ Flags:
 const captureHelp = `Capture a thought, idea, or observation.
 
 Usage:
-  forge capture --quick [--project PROJECT] [--kind KIND] DESCRIPTION
+  forge capture --quick [--project PROJECT] [--kind KIND]
+                [--tags TAGS] DESCRIPTION
 
 Flags:
   -h, --help             Show help
       --kind KIND        Set capture kind (default: thought)
       --project PROJECT  Associate the capture with a project
       --quick            Capture without prompting (currently required)
+      --tags TAGS        Add comma-separated tags
 `
 
 // Runtime contains process facilities used by the CLI. Keeping them explicit
@@ -108,6 +110,7 @@ func runCapture(ctx context.Context, args []string, rt Runtime) error {
 		Description: options.description,
 		Project:     options.project,
 		Kind:        options.kind,
+		Tags:        options.tags,
 	}, rt.Now(), rt.Random)
 	if err != nil {
 		return fmt.Errorf("create capture: %w", err)
@@ -153,6 +156,7 @@ type quickCaptureOptions struct {
 	description string
 	project     string
 	kind        domain.CaptureKind
+	tags        string
 }
 
 func parseQuickCapture(args []string) (quickCaptureOptions, error) {
@@ -161,6 +165,7 @@ func parseQuickCapture(args []string) (quickCaptureOptions, error) {
 	positionals := make([]string, 0, 1)
 	kind := domain.CaptureKindThought
 	project := ""
+	tags := ""
 	for index := 0; index < len(args); index++ {
 		arg := args[index]
 		switch {
@@ -196,6 +201,14 @@ func parseQuickCapture(args []string) (quickCaptureOptions, error) {
 			project = args[index]
 		case !optionsEnded && strings.HasPrefix(arg, "--project="):
 			project = strings.TrimPrefix(arg, "--project=")
+		case !optionsEnded && arg == "--tags":
+			if index+1 >= len(args) || strings.HasPrefix(args[index+1], "-") {
+				return quickCaptureOptions{}, &UsageError{Message: "--tags requires a value"}
+			}
+			index++
+			tags = args[index]
+		case !optionsEnded && strings.HasPrefix(arg, "--tags="):
+			tags = strings.TrimPrefix(arg, "--tags=")
 		case !optionsEnded && len(arg) > 0 && arg[0] == '-':
 			return quickCaptureOptions{}, &UsageError{Argument: arg}
 		default:
@@ -215,6 +228,7 @@ func parseQuickCapture(args []string) (quickCaptureOptions, error) {
 		description: positionals[0],
 		project:     project,
 		kind:        kind,
+		tags:        tags,
 	}, nil
 }
 

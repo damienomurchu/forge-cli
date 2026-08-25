@@ -32,7 +32,7 @@ data-backed command slice:
 | `forge`, `forge -h`, `forge --help` | Implemented |
 | `forge --version` | Implemented |
 | `forge capture -h`, `forge capture --help` | Implemented |
-| `forge capture --quick [--project PROJECT] [--kind KIND] DESCRIPTION` | Implemented |
+| `forge capture --quick [--project PROJECT] [--kind KIND] [--tags TAGS] DESCRIPTION` | Implemented |
 | Other `forge capture` options and interactive mode | Planned |
 | `forge friction` | Planned |
 | `forge list` | Planned |
