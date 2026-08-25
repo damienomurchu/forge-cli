@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -77,7 +78,8 @@ Flags:
 const listHelp = `List records newest first.
 
 Usage:
-  forge list [--type TYPE] [--project PROJECT] [--status STATUS] [--json]
+  forge list [--limit N] [--type TYPE] [--project PROJECT] [--status STATUS]
+             [--json]
 
 Output:
   <id>  <type>  <status>  <description>
@@ -87,6 +89,7 @@ Missing storage and empty results produce no output and succeed.
 Flags:
   -h, --help            Show help
       --json             Write records as a JSON array
+      --limit N          Return at most N records
       --project PROJECT  Filter by project
       --status STATUS    Filter by lifecycle status
       --type TYPE        Filter by capture or friction
@@ -256,11 +259,44 @@ func parseList(args []string) (listCommandOptions, error) {
 				return listCommandOptions{}, err
 			}
 			options.filters.Status = &status
+		case arg == "--limit":
+			if index+1 >= len(args) || strings.HasPrefix(args[index+1], "--") {
+				return listCommandOptions{}, &UsageError{Message: "--limit requires a value"}
+			}
+			index++
+			limit, err := parseListLimit(args[index])
+			if err != nil {
+				return listCommandOptions{}, err
+			}
+			options.filters.Limit = &limit
+		case strings.HasPrefix(arg, "--limit="):
+			value := strings.TrimPrefix(arg, "--limit=")
+			if value == "" {
+				return listCommandOptions{}, &UsageError{Message: "--limit requires a value"}
+			}
+			limit, err := parseListLimit(value)
+			if err != nil {
+				return listCommandOptions{}, err
+			}
+			options.filters.Limit = &limit
 		default:
 			return listCommandOptions{}, &UsageError{Argument: arg}
 		}
 	}
 	return options, nil
+}
+
+func parseListLimit(value string) (int, error) {
+	for _, character := range value {
+		if character < '0' || character > '9' {
+			return 0, &domain.InvalidValueError{Field: "limit", Value: value}
+		}
+	}
+	limit, err := strconv.Atoi(value)
+	if err != nil || limit <= 0 {
+		return 0, &domain.InvalidValueError{Field: "limit", Value: value}
+	}
+	return limit, nil
 }
 
 func writeListResult(w io.Writer, records []domain.Record, jsonOutput bool) error {

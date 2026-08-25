@@ -311,6 +311,43 @@ func TestListFiltersByStatusAndComposesWithOtherFilters(t *testing.T) {
 	}
 }
 
+func TestListLimitsOrderedFilteredResults(t *testing.T) {
+	dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+	createListRecords(t, dataDirectory)
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "spaced human limits newest first",
+			args: []string{"list", "--limit", "1"},
+			want: "frc_00000000000000000000000000000000  friction  captured  Newer friction\n",
+		},
+		{
+			name: "equals JSON composes with filters",
+			args: []string{"list", "--type", "capture", "--status", "captured", "--limit=1", "--json"},
+			want: "[{\"id\":\"cap_00000000000000000000000000000000\",\"type\":\"capture\",\"description\":\"Older capture\",\"project\":null,\"status\":\"captured\",\"details\":{\"kind\":\"thought\",\"tags\":[]},\"created_at\":\"2026-08-25T11:00:00.000000Z\",\"updated_at\":\"2026-08-25T11:00:00.000000Z\"}]\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			if err := Run(
+				context.Background(),
+				tt.args,
+				quickCaptureRuntime(dataDirectory, &stdout),
+				"dev",
+			); err != nil {
+				t.Fatalf("Run() error = %v", err)
+			}
+			if got := stdout.String(); got != tt.want {
+				t.Errorf("stdout = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestListUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 	for _, args := range [][]string{
 		{"list", "extra"},
@@ -321,6 +358,9 @@ func TestListUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 		{"list", "--project="},
 		{"list", "--status"},
 		{"list", "--status="},
+		{"list", "--limit"},
+		{"list", "--limit="},
+		{"list", "--limit", "--json"},
 	} {
 		t.Run(args[1], func(t *testing.T) {
 			rt := quickCaptureRuntime(t.TempDir(), &bytes.Buffer{})
@@ -389,6 +429,33 @@ func TestListInvalidStatusDoesNotInspectEnvironment(t *testing.T) {
 	}
 	if stdout.Len() != 0 {
 		t.Errorf("stdout = %q, want empty", stdout.String())
+	}
+}
+
+func TestListInvalidLimitDoesNotInspectEnvironment(t *testing.T) {
+	for _, args := range [][]string{
+		{"list", "--limit", "0"},
+		{"list", "--limit", "-1"},
+		{"list", "--limit=+1"},
+		{"list", "--limit=abc"},
+		{"list", "--limit=1.5"},
+		{"list", "--limit=999999999999999999999999999999999999"},
+	} {
+		t.Run(strings.Join(args[1:], " "), func(t *testing.T) {
+			var stdout bytes.Buffer
+			rt := quickCaptureRuntime(t.TempDir(), &stdout)
+			rt.Env = func(string) string {
+				t.Fatal("invalid list limit inspected environment")
+				return ""
+			}
+			err := Run(context.Background(), args, rt, "dev")
+			if err == nil || !strings.Contains(err.Error(), "invalid limit") {
+				t.Fatalf("Run() error = %v, want invalid-limit error", err)
+			}
+			if stdout.Len() != 0 {
+				t.Errorf("stdout = %q, want empty", stdout.String())
+			}
+		})
 	}
 }
 

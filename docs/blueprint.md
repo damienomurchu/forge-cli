@@ -365,8 +365,9 @@ Current implementation status:
   is implemented as a data-free path with stable golden output. Unfiltered list
   JSON emits a complete newest-first array, including `[]` for missing storage.
   Human and JSON lists accept validated capture-or-friction type and lifecycle
-  status filters plus a normalized project filter. These filters compose with AND
-  semantics.
+  status filters, a normalized project filter, and a positive result limit. The
+  filters compose with AND semantics, and the limit applies after filtering and
+  deterministic newest-first ordering. This completes the contracted list command.
 - Phases 6 through 8 remain planned and unimplemented.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.
