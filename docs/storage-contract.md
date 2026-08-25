@@ -189,6 +189,10 @@ Transactional capture insertion is implemented: the validated record row and all
 ordered tag rows commit together, and any record or tag failure rolls back the
 entire capture.
 
+Transactional friction insertion is implemented: all shared and friction-specific
+values commit in one record row, capture-only values remain null, no tags are
+created, and any failure rolls back the operation.
+
 ## Initialization and read-only commands
 
 Only commands that create records may create the data directory, database, or

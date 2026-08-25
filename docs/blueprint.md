@@ -339,8 +339,8 @@ Current implementation status:
 - Phase 4, secure storage, is in progress; centralized read-only path resolution
   and secure data-directory and database-file opening are implemented. SQLite
   connection setup with required pragmas is implemented; transactional migrations
-  and transactional capture insertion are also implemented. Remaining repository
-  operations are next.
+  and transactional capture and friction insertion are also implemented.
+  Repository reads and updates are next.
 - Phases 5 through 8 remain planned and unimplemented.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.

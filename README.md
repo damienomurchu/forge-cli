@@ -12,9 +12,8 @@ record model, deterministic JSON, and terminal-safe human output foundations.
 Phase 4 secure storage work now includes centralized database path resolution and
 secure preparation and opening of owned, private data directories and database
 files, plus single-connection SQLite setup with required pragmas. Transactional
-migration inspection and application are also implemented. Repository operations
-have begun with transactional capture insertion; remaining repository operations
-are next.
+migration inspection and application are also implemented. Repository creation is
+implemented for both captures and friction; repository reads and updates are next.
 
 ### Command availability
 
