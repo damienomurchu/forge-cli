@@ -372,7 +372,6 @@ func TestQuickCaptureUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 		wantErr string
 	}{
 		{name: "missing description", args: []string{"capture", "--quick"}, wantErr: "capture requires a description"},
-		{name: "missing interactive kind", args: []string{"capture", "description"}, wantErr: "capture requires --kind when --quick is omitted"},
 		{name: "missing kind", args: []string{"capture", "--quick", "--kind"}, wantErr: `--kind requires a value`},
 		{name: "empty kind", args: []string{"capture", "--quick", "--kind=", "description"}, wantErr: `--kind requires a value`},
 		{name: "missing project", args: []string{"capture", "--quick", "--project"}, wantErr: `--project requires a value`},

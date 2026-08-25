@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -13,6 +14,12 @@ import (
 )
 
 type fakePrompt struct {
+	selection      string
+	selectErr      error
+	selectCalls    int
+	selectLabel    string
+	selectChoices  []string
+	selectDefault  string
 	confirmed      bool
 	err            error
 	confirmCalls   int
@@ -20,8 +27,39 @@ type fakePrompt struct {
 	confirmDefault bool
 }
 
-func (p *fakePrompt) Select(context.Context, string, []string, string) (string, error) {
-	return "", errors.New("unexpected select prompt")
+func (p *fakePrompt) Select(_ context.Context, label string, choices []string, defaultValue string) (string, error) {
+	p.selectCalls++
+	p.selectLabel = label
+	p.selectChoices = append([]string(nil), choices...)
+	p.selectDefault = defaultValue
+	return p.selection, p.selectErr
+}
+
+func TestInteractiveCaptureSelectsOmittedKindBeforeConfirmation(t *testing.T) {
+	dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+	var stdout bytes.Buffer
+	prompter := &fakePrompt{selection: "idea", confirmed: true}
+	rt := interactiveCaptureRuntime(dataDirectory, &stdout, prompter)
+	if err := Run(
+		context.Background(),
+		[]string{"capture", "Select a kind"},
+		rt,
+		"dev",
+	); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	wantChoices := []string{"thought", "idea", "observation", "question", "decision", "seed"}
+	if prompter.selectCalls != 1 || prompter.selectLabel != "Kind" ||
+		prompter.selectDefault != "thought" || !slices.Equal(prompter.selectChoices, wantChoices) {
+		t.Errorf("selection = calls:%d label:%q choices:%v default:%q", prompter.selectCalls, prompter.selectLabel, prompter.selectChoices, prompter.selectDefault)
+	}
+	if prompter.confirmCalls != 1 {
+		t.Errorf("Confirm() calls = %d, want 1", prompter.confirmCalls)
+	}
+	record := readQuickCapture(t, dataDirectory)
+	if record.Details.Capture.Kind.String() != "idea" {
+		t.Errorf("stored kind = %q, want idea", record.Details.Capture.Kind)
+	}
 }
 
 func (p *fakePrompt) Text(context.Context, string) (string, error) {
@@ -86,6 +124,8 @@ func TestInteractiveCaptureDeclineWritesNothingAndDoesNotInspectStorage(t *testi
 	var stdout bytes.Buffer
 	prompter := &fakePrompt{confirmed: false}
 	rt := interactiveCaptureRuntime(dataDirectory, &stdout, prompter)
+	rt.Now = nil
+	rt.Random = nil
 	rt.Env = func(string) string {
 		t.Fatal("declined capture inspected the environment")
 		return ""
@@ -180,6 +220,50 @@ func TestInteractiveCaptureCancellationMapsToInterruptedWithoutStorage(t *testin
 	}
 	if _, statErr := os.Stat(dataDirectory); !errors.Is(statErr, os.ErrNotExist) {
 		t.Fatalf("data directory state error = %v, want not exist", statErr)
+	}
+}
+
+func TestInteractiveCaptureSelectionCancellationSkipsConfirmationAndStorage(t *testing.T) {
+	dataDirectory := filepath.Join(t.TempDir(), "missing")
+	var stdout bytes.Buffer
+	prompter := &fakePrompt{selectErr: prompt.ErrCancelled}
+	rt := interactiveCaptureRuntime(dataDirectory, &stdout, prompter)
+	rt.Now = nil
+	rt.Random = nil
+	rt.Env = func(string) string {
+		t.Fatal("cancelled selection inspected the environment")
+		return ""
+	}
+	err := Run(context.Background(), []string{"capture", "Cancel selection"}, rt, "dev")
+	var interrupted *InterruptedError
+	if !errors.As(err, &interrupted) || !errors.Is(err, prompt.ErrCancelled) {
+		t.Fatalf("Run() error = %T %v, want interrupted cancellation", err, err)
+	}
+	if prompter.confirmCalls != 0 {
+		t.Errorf("Confirm() calls = %d, want 0", prompter.confirmCalls)
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("stdout = %q, want empty", stdout.String())
+	}
+	if _, statErr := os.Stat(dataDirectory); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("data directory state error = %v, want not exist", statErr)
+	}
+}
+
+func TestInteractiveCaptureRejectsInvalidSelectedKindBeforeConfirmationOrStorage(t *testing.T) {
+	var stdout bytes.Buffer
+	prompter := &fakePrompt{selection: "invalid"}
+	rt := interactiveCaptureRuntime(t.TempDir(), &stdout, prompter)
+	rt.Env = func(string) string {
+		t.Fatal("invalid selection inspected the environment")
+		return ""
+	}
+	err := Run(context.Background(), []string{"capture", "Invalid selection"}, rt, "dev")
+	if err == nil || !strings.Contains(err.Error(), "invalid capture kind") {
+		t.Fatalf("Run() error = %v, want selected-kind validation", err)
+	}
+	if prompter.confirmCalls != 0 {
+		t.Errorf("Confirm() calls = %d, want 0", prompter.confirmCalls)
 	}
 }
 

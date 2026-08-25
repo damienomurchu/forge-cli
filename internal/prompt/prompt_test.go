@@ -24,6 +24,35 @@ func TestConfirmUsesInjectedStreams(t *testing.T) {
 	}
 }
 
+func TestSelectNavigation(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{name: "j", input: "j\r", want: "idea"},
+		{name: "down arrow", input: "\x1b[B\r", want: "idea"},
+		{name: "j then k", input: "jk\r", want: "thought"},
+		{name: "down then up", input: "\x1b[B\x1b[A\r", want: "thought"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var output bytes.Buffer
+			got, err := New(strings.NewReader(tt.input), &output).
+				Select(context.Background(), "Kind", []string{"thought", "idea"}, "thought")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != tt.want {
+				t.Errorf("Select() = %q, want %q", got, tt.want)
+			}
+			if output.Len() == 0 {
+				t.Fatal("Select() wrote no prompt output")
+			}
+		})
+	}
+}
+
 func TestCancellationIsClassified(t *testing.T) {
 	_, err := New(bytes.NewReader([]byte{3}), &bytes.Buffer{}).
 		Confirm(context.Background(), "Create capture?", true)

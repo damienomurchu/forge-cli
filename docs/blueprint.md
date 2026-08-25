@@ -378,10 +378,12 @@ Current implementation status:
 - Phase 6 is in progress. The accepted `huh` adapter now exists behind the
   production prompt boundary with injected streams, distinct cancellation and EOF
   errors, boundary validation, and PTY coverage for Ctrl-C terminal restoration.
-  A non-quick capture with an explicit kind requires TTY confirmation before any
-  storage access; acceptance persists normally, decline writes nothing, and
-  cancellation exits as an interruption. Interactive kind selection remains
-  unimplemented.
+  Non-quick capture selects an omitted kind from the approved vocabulary, then
+  requires TTY confirmation before record generation or storage access. An
+  explicit kind skips selection but still requires confirmation. Acceptance
+  persists normally, decline writes nothing, and cancellation during either
+  prompt exits as an interruption. This completes the interactive capture
+  contract.
 - Phases 7 and 8 remain planned and unimplemented.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.

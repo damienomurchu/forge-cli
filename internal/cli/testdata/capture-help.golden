@@ -6,7 +6,7 @@ Usage:
 
 Flags:
   -h, --help             Show help
-      --kind KIND        Set capture kind (required without --quick)
+      --kind KIND        Set capture kind (default: thought)
       --project PROJECT  Associate the capture with a project
       --quick            Capture without confirmation
       --tags TAGS        Add comma-separated tags

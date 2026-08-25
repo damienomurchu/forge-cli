@@ -47,7 +47,7 @@ Usage:
 
 Flags:
   -h, --help             Show help
-      --kind KIND        Set capture kind (required without --quick)
+      --kind KIND        Set capture kind (default: thought)
       --project PROJECT  Associate the capture with a project
       --quick            Capture without confirmation
       --tags TAGS        Add comma-separated tags
@@ -855,16 +855,10 @@ func runCapture(ctx context.Context, args []string, rt Runtime) error {
 	if err != nil {
 		return err
 	}
-	record, err := domain.NewCapture(domain.CaptureInput{
-		Description: options.description,
-		Project:     options.project,
-		Kind:        options.kind,
-		Tags:        options.tags,
-	}, rt.Now(), rt.Random)
-	if err != nil {
-		return fmt.Errorf("create capture: %w", err)
-	}
 	if !options.quick {
+		if _, err := domain.NormalizeDescription(options.description); err != nil {
+			return err
+		}
 		if rt.IsTTY == nil || !rt.IsTTY() {
 			return &domain.InvalidValueError{Field: "interaction", Value: "stdin is not a terminal"}
 		}
@@ -875,16 +869,33 @@ func runCapture(ctx context.Context, args []string, rt Runtime) error {
 		if prompt == nil {
 			return errors.New("capture prompt is not configured")
 		}
+		if !options.kindSet {
+			selected, err := prompt.Select(ctx, "Kind", captureKindChoices(), domain.CaptureKindThought.String())
+			if err != nil {
+				return capturePromptError("select kind for", err)
+			}
+			kind, err := domain.ParseCaptureKind(selected)
+			if err != nil {
+				return fmt.Errorf("validate selected capture kind: %w", err)
+			}
+			options.kind = kind
+		}
 		confirmed, err := prompt.Confirm(ctx, "Create capture?", true)
 		if err != nil {
-			if errors.Is(err, promptui.ErrCancelled) {
-				return &InterruptedError{Message: "capture cancelled", Cause: err}
-			}
-			return fmt.Errorf("confirm capture: %w", err)
+			return capturePromptError("confirm", err)
 		}
 		if !confirmed {
 			return nil
 		}
+	}
+	record, err := domain.NewCapture(domain.CaptureInput{
+		Description: options.description,
+		Project:     options.project,
+		Kind:        options.kind,
+		Tags:        options.tags,
+	}, rt.Now(), rt.Random)
+	if err != nil {
+		return fmt.Errorf("create capture: %w", err)
 	}
 
 	databasePath, err := config.ResolveDatabasePath(rt.GOOS, rt.Env)
@@ -921,6 +932,24 @@ func runCapture(ctx context.Context, args []string, rt Runtime) error {
 	return nil
 }
 
+func captureKindChoices() []string {
+	return []string{
+		domain.CaptureKindThought.String(),
+		domain.CaptureKindIdea.String(),
+		domain.CaptureKindObservation.String(),
+		domain.CaptureKindQuestion.String(),
+		domain.CaptureKindDecision.String(),
+		domain.CaptureKindSeed.String(),
+	}
+}
+
+func capturePromptError(action string, err error) error {
+	if errors.Is(err, promptui.ErrCancelled) {
+		return &InterruptedError{Message: "capture cancelled", Cause: err}
+	}
+	return fmt.Errorf("%s capture: %w", action, err)
+}
+
 func commandHelpRequested(args []string) bool {
 	for _, arg := range args {
 		if arg == "--" {
@@ -940,6 +969,7 @@ type quickCaptureOptions struct {
 	tags        string
 	json        bool
 	quick       bool
+	kindSet     bool
 }
 
 func parseQuickCapture(args []string) (quickCaptureOptions, error) {
@@ -1010,9 +1040,6 @@ func parseQuickCapture(args []string) (quickCaptureOptions, error) {
 	if len(positionals) > 1 {
 		return quickCaptureOptions{}, &UsageError{Message: fmt.Sprintf("unexpected argument %q", positionals[1])}
 	}
-	if !quick && !kindSet {
-		return quickCaptureOptions{}, &UsageError{Message: "capture requires --kind when --quick is omitted"}
-	}
 	return quickCaptureOptions{
 		description: positionals[0],
 		project:     project,
@@ -1020,6 +1047,7 @@ func parseQuickCapture(args []string) (quickCaptureOptions, error) {
 		tags:        tags,
 		json:        jsonOutput,
 		quick:       quick,
+		kindSet:     kindSet,
 	}, nil
 }
 
