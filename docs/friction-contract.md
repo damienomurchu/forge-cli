@@ -69,8 +69,11 @@ JSON stdout.
 A successful friction capture creates one record with type `friction` and initial
 status `captured`.
 
-Human mode writes a concise confirmation containing the generated record ID to
-stdout. Exact wording will be approved with the implementation's golden test.
+Human mode writes this concise confirmation to stdout:
+
+```text
+Created friction <record-id>
+```
 
 With `--json`, success emits exactly one record object followed by a newline. It
 obeys `docs/cli-contract.md`: no human commentary is mixed into stdout, and the
