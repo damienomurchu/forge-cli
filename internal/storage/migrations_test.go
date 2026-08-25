@@ -5,6 +5,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -95,6 +96,69 @@ func TestInspectSchemaRejectsNewerDatabase(t *testing.T) {
 	}
 	if err := ApplyMigrations(ctx, db); err == nil || err.Error() != want {
 		t.Fatalf("ApplyMigrations() error = %v, want %q", err, want)
+	}
+}
+
+func TestInspectSchemaRejectsArchivedPythonMigrationLayoutWithoutModification(t *testing.T) {
+	db := openTestSQLite(t)
+	ctx := context.Background()
+	if _, err := db.ExecContext(ctx, `CREATE TABLE schema_migrations (
+		name TEXT PRIMARY KEY,
+		applied_at TEXT NOT NULL
+	)`); err != nil {
+		t.Fatalf("create archived migration table error = %v", err)
+	}
+	const appliedAt = "2026-08-23T07:58:05.290Z"
+	if _, err := db.ExecContext(ctx,
+		`INSERT INTO schema_migrations(name, applied_at) VALUES (?, ?)`,
+		"001_initial.sql",
+		appliedAt,
+	); err != nil {
+		t.Fatalf("insert archived migration row error = %v", err)
+	}
+
+	want := "incompatible database schema: schema_migrations has an unsupported layout"
+	for name, inspect := range map[string]func() error{
+		"inspect": func() error {
+			_, err := InspectSchema(ctx, db)
+			return err
+		},
+		"apply": func() error { return ApplyMigrations(ctx, db) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := inspect()
+			if !errors.Is(err, ErrIncompatibleSchema) || err.Error() != want {
+				t.Fatalf("schema operation error = %v, want %q", err, want)
+			}
+		})
+	}
+
+	var name, storedAppliedAt string
+	if err := db.QueryRowContext(ctx,
+		`SELECT name, applied_at FROM schema_migrations`,
+	).Scan(&name, &storedAppliedAt); err != nil {
+		t.Fatalf("read preserved migration row error = %v", err)
+	}
+	if name != "001_initial.sql" || storedAppliedAt != appliedAt {
+		t.Errorf("migration row = %q/%q, want original values", name, storedAppliedAt)
+	}
+	assertTableMissing(t, db, "records")
+}
+
+func TestInspectSchemaRejectsUnexpectedMigrationColumns(t *testing.T) {
+	db := openTestSQLite(t)
+	if _, err := db.Exec(`CREATE TABLE schema_migrations (
+		version INTEGER PRIMARY KEY,
+		name TEXT NOT NULL,
+		applied_at TEXT NOT NULL,
+		unexpected TEXT
+	)`); err != nil {
+		t.Fatalf("create altered migration table error = %v", err)
+	}
+
+	_, err := InspectSchema(context.Background(), db)
+	if !errors.Is(err, ErrIncompatibleSchema) {
+		t.Fatalf("InspectSchema() error = %v, want ErrIncompatibleSchema", err)
 	}
 }
 

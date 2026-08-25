@@ -11,6 +11,10 @@ import (
 
 const LatestSchemaVersion = 1
 
+// ErrIncompatibleSchema identifies an existing database whose migration
+// metadata was not created by this Go implementation.
+var ErrIncompatibleSchema = errors.New("incompatible database schema")
+
 type migration struct {
 	version int
 	name    string
@@ -96,6 +100,9 @@ func currentSchemaVersion(ctx context.Context, db *sql.DB) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("inspect migration table: %w", err)
 	}
+	if err := validateMigrationTableLayout(ctx, db); err != nil {
+		return 0, err
+	}
 
 	var version int
 	if err := db.QueryRowContext(ctx,
@@ -104,6 +111,55 @@ func currentSchemaVersion(ctx context.Context, db *sql.DB) (int, error) {
 		return 0, fmt.Errorf("read schema version: %w", err)
 	}
 	return version, nil
+}
+
+func validateMigrationTableLayout(ctx context.Context, db *sql.DB) error {
+	rows, err := db.QueryContext(ctx, `PRAGMA table_info(schema_migrations)`)
+	if err != nil {
+		return fmt.Errorf("inspect migration table layout: %w", err)
+	}
+	defer rows.Close()
+
+	columns := make([]string, 0, 3)
+	for rows.Next() {
+		var (
+			position     int
+			name         string
+			columnType   string
+			notNull      int
+			defaultValue any
+			primaryKey   int
+		)
+		if err := rows.Scan(
+			&position,
+			&name,
+			&columnType,
+			&notNull,
+			&defaultValue,
+			&primaryKey,
+		); err != nil {
+			return fmt.Errorf("inspect migration table layout: %w", err)
+		}
+		columns = append(columns, name)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("inspect migration table layout: %w", err)
+	}
+
+	want := []string{"version", "name", "applied_at"}
+	if len(columns) != len(want) {
+		return unsupportedMigrationTableLayout()
+	}
+	for index := range want {
+		if columns[index] != want[index] {
+			return unsupportedMigrationTableLayout()
+		}
+	}
+	return nil
+}
+
+func unsupportedMigrationTableLayout() error {
+	return fmt.Errorf("%w: schema_migrations has an unsupported layout", ErrIncompatibleSchema)
 }
 
 func applyMigration(ctx context.Context, db *sql.DB, change migration) error {

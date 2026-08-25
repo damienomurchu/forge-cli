@@ -170,6 +170,12 @@ The production migration registry currently embeds and applies
 reports version `0` with a migration required, while a database newer than the
 executable is rejected without modification.
 
+If an existing `schema_migrations` table does not have the Go-owned
+`version`, `name`, and `applied_at` layout, Forge reports an incompatible schema
+and makes no migration attempt. In particular, databases from the archived Python
+CLI are context only and are not adopted implicitly. Keep one under a separate
+data directory; a future explicit importer may be considered if users need one.
+
 The initial driver decision in `docs/decisions/001-sqlite-driver.md` sets a 250 ms
 SQLite busy timeout. Application tests will confirm the resulting error remains
 actionable under real command execution. Journal and synchronous modes retain
