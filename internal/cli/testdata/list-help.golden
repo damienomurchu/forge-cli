@@ -1,7 +1,7 @@
 List records newest first.
 
 Usage:
-  forge list [--type TYPE] [--json]
+  forge list [--type TYPE] [--project PROJECT] [--json]
 
 Output:
   <id>  <type>  <status>  <description>
@@ -9,6 +9,7 @@ Output:
 Missing storage and empty results produce no output and succeed.
 
 Flags:
-  -h, --help    Show help
-      --json     Write records as a JSON array
-      --type TYPE  Filter by capture or friction
+  -h, --help            Show help
+      --json             Write records as a JSON array
+      --project PROJECT  Filter by project
+      --type TYPE        Filter by capture or friction

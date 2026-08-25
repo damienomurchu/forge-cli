@@ -77,7 +77,7 @@ Flags:
 const listHelp = `List records newest first.
 
 Usage:
-  forge list [--type TYPE] [--json]
+  forge list [--type TYPE] [--project PROJECT] [--json]
 
 Output:
   <id>  <type>  <status>  <description>
@@ -85,9 +85,10 @@ Output:
 Missing storage and empty results produce no output and succeed.
 
 Flags:
-  -h, --help    Show help
-      --json     Write records as a JSON array
-      --type TYPE  Filter by capture or friction
+  -h, --help            Show help
+      --json             Write records as a JSON array
+      --project PROJECT  Filter by project
+      --type TYPE        Filter by capture or friction
 `
 
 // Runtime contains process facilities used by the CLI. Keeping them explicit
@@ -214,6 +215,26 @@ func parseList(args []string) (listCommandOptions, error) {
 				return listCommandOptions{}, err
 			}
 			options.filters.Type = &recordType
+		case arg == "--project":
+			if index+1 >= len(args) || strings.HasPrefix(args[index+1], "-") {
+				return listCommandOptions{}, &UsageError{Message: "--project requires a value"}
+			}
+			index++
+			project := domain.NormalizeOptionalText(args[index])
+			if project == nil {
+				return listCommandOptions{}, &domain.InvalidValueError{Field: "project", Value: args[index]}
+			}
+			options.filters.Project = project
+		case strings.HasPrefix(arg, "--project="):
+			value := strings.TrimPrefix(arg, "--project=")
+			if value == "" {
+				return listCommandOptions{}, &UsageError{Message: "--project requires a value"}
+			}
+			project := domain.NormalizeOptionalText(value)
+			if project == nil {
+				return listCommandOptions{}, &domain.InvalidValueError{Field: "project", Value: value}
+			}
+			options.filters.Project = project
 		default:
 			return listCommandOptions{}, &UsageError{Argument: arg}
 		}

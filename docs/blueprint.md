@@ -364,7 +364,8 @@ Current implementation status:
   storage, with missing storage represented by successful empty output. List help
   is implemented as a data-free path with stable golden output. Unfiltered list
   JSON emits a complete newest-first array, including `[]` for missing storage.
-  Human and JSON lists accept a validated capture-or-friction type filter.
+  Human and JSON lists accept a validated capture-or-friction type filter and a
+  normalized project filter. These filters compose with AND semantics.
 - Phases 6 through 8 remain planned and unimplemented.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.

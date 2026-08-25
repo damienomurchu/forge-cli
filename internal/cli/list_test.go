@@ -184,12 +184,90 @@ func TestListTypeFilterWithNoMatchesWritesEmptyJSONArray(t *testing.T) {
 	}
 }
 
+func TestListFiltersByNormalizedProjectAndComposesWithType(t *testing.T) {
+	dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+	for _, args := range [][]string{
+		{"capture", "--quick", "--project", "forge", "Forge capture"},
+		{"friction", "--quick", "--project", "forge", "Forge friction"},
+	} {
+		if err := Run(
+			context.Background(),
+			args,
+			quickCaptureRuntime(dataDirectory, &bytes.Buffer{}),
+			"dev",
+		); err != nil {
+			t.Fatalf("create record error = %v", err)
+		}
+	}
+
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "spaced value is normalized",
+			args: []string{"list", "--project", "  forge  "},
+			want: "frc_00000000000000000000000000000000  friction  captured  Forge friction\n" +
+				"cap_00000000000000000000000000000000  capture  captured  Forge capture\n",
+		},
+		{
+			name: "equals value composes with type",
+			args: []string{"list", "--project=forge", "--type", "friction"},
+			want: "frc_00000000000000000000000000000000  friction  captured  Forge friction\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			if err := Run(
+				context.Background(),
+				tt.args,
+				quickCaptureRuntime(dataDirectory, &stdout),
+				"dev",
+			); err != nil {
+				t.Fatalf("Run() error = %v", err)
+			}
+			if got := stdout.String(); got != tt.want {
+				t.Errorf("stdout = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestListProjectFilterWithNoMatchesWritesEmptyJSONArray(t *testing.T) {
+	dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+	if err := Run(
+		context.Background(),
+		[]string{"capture", "--quick", "--project", "forge", "Forge capture"},
+		quickCaptureRuntime(dataDirectory, &bytes.Buffer{}),
+		"dev",
+	); err != nil {
+		t.Fatalf("create capture error = %v", err)
+	}
+
+	var stdout bytes.Buffer
+	if err := Run(
+		context.Background(),
+		[]string{"list", "--project", "other", "--json"},
+		quickCaptureRuntime(dataDirectory, &stdout),
+		"dev",
+	); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if got, want := stdout.String(), "[]\n"; got != want {
+		t.Errorf("stdout = %q, want %q", got, want)
+	}
+}
+
 func TestListUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 	for _, args := range [][]string{
 		{"list", "extra"},
 		{"list", "--unknown"},
 		{"list", "--type"},
 		{"list", "--type="},
+		{"list", "--project"},
+		{"list", "--project="},
 	} {
 		t.Run(args[1], func(t *testing.T) {
 			rt := quickCaptureRuntime(t.TempDir(), &bytes.Buffer{})
@@ -201,6 +279,29 @@ func TestListUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 			var usageErr *UsageError
 			if !errors.As(err, &usageErr) {
 				t.Fatalf("Run() error = %T %v, want *UsageError", err, err)
+			}
+		})
+	}
+}
+
+func TestListEmptyProjectDoesNotInspectEnvironment(t *testing.T) {
+	for _, args := range [][]string{
+		{"list", "--project", "  \t"},
+		{"list", "--project=  \t"},
+	} {
+		t.Run(strings.Join(args[1:], " "), func(t *testing.T) {
+			var stdout bytes.Buffer
+			rt := quickCaptureRuntime(t.TempDir(), &stdout)
+			rt.Env = func(string) string {
+				t.Fatal("invalid list project inspected environment")
+				return ""
+			}
+			err := Run(context.Background(), args, rt, "dev")
+			if err == nil || !strings.Contains(err.Error(), "invalid project") {
+				t.Fatalf("Run() error = %v, want invalid-project error", err)
+			}
+			if stdout.Len() != 0 {
+				t.Errorf("stdout = %q, want empty", stdout.String())
 			}
 		})
 	}
