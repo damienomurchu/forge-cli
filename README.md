@@ -67,8 +67,7 @@ harness self-test.
 From the repository root, build a local executable using the pinned Go toolchain:
 
 ```fish
-mkdir -p bin
-mise exec -- go build -o bin/forge ./cmd/forge
+just build
 ```
 
 The `bin/` directory and a root-level `forge` binary are ignored by Git. Exercise
@@ -80,6 +79,12 @@ the currently implemented behavior with:
 ./bin/forge --version
 ./bin/forge unknown
 echo $status
+```
+
+For a quick smoke test that builds Forge and runs its help and version paths:
+
+```fish
+just try
 ```
 
 The final command prints an error to stderr and returns status `2`. To test version

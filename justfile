@@ -40,9 +40,15 @@ test-cover:
 vuln:
     mise exec -- go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
 
-# Build every package for the host platform.
+# Build a local Forge executable at bin/forge.
 build:
-    mise exec -- go build ./...
+    mkdir -p bin
+    mise exec -- go build -o bin/forge ./cmd/forge
+
+# Build Forge and exercise the implemented help and version paths.
+try: build
+    ./bin/forge --help
+    ./bin/forge --version
 
 # Verify the supported release targets build without CGO.
 cross-build:
