@@ -76,7 +76,7 @@ forge friction [--quick] [--project PROJECT] [--frequency FREQUENCY]
 forge list [--limit N] [--type TYPE] [--project PROJECT] [--status STATUS]
            [--json]
 forge show RECORD_ID [--json]
-forge update RECORD_ID --status STATUS
+forge update [--json] RECORD_ID --status STATUS
 forge review [friction] [--json]
 ```
 
