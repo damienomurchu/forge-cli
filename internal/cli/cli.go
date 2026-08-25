@@ -77,7 +77,7 @@ Flags:
 const listHelp = `List records newest first.
 
 Usage:
-  forge list [--type TYPE] [--project PROJECT] [--json]
+  forge list [--type TYPE] [--project PROJECT] [--status STATUS] [--json]
 
 Output:
   <id>  <type>  <status>  <description>
@@ -88,6 +88,7 @@ Flags:
   -h, --help            Show help
       --json             Write records as a JSON array
       --project PROJECT  Filter by project
+      --status STATUS    Filter by lifecycle status
       --type TYPE        Filter by capture or friction
 `
 
@@ -235,6 +236,26 @@ func parseList(args []string) (listCommandOptions, error) {
 				return listCommandOptions{}, &domain.InvalidValueError{Field: "project", Value: value}
 			}
 			options.filters.Project = project
+		case arg == "--status":
+			if index+1 >= len(args) || strings.HasPrefix(args[index+1], "-") {
+				return listCommandOptions{}, &UsageError{Message: "--status requires a value"}
+			}
+			index++
+			status, err := domain.ParseStatus(args[index])
+			if err != nil {
+				return listCommandOptions{}, err
+			}
+			options.filters.Status = &status
+		case strings.HasPrefix(arg, "--status="):
+			value := strings.TrimPrefix(arg, "--status=")
+			if value == "" {
+				return listCommandOptions{}, &UsageError{Message: "--status requires a value"}
+			}
+			status, err := domain.ParseStatus(value)
+			if err != nil {
+				return listCommandOptions{}, err
+			}
+			options.filters.Status = &status
 		default:
 			return listCommandOptions{}, &UsageError{Argument: arg}
 		}

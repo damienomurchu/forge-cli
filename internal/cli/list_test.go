@@ -260,6 +260,57 @@ func TestListProjectFilterWithNoMatchesWritesEmptyJSONArray(t *testing.T) {
 	}
 }
 
+func TestListFiltersByStatusAndComposesWithOtherFilters(t *testing.T) {
+	dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+	for _, args := range [][]string{
+		{"capture", "--quick", "--project", "forge", "Captured forge capture"},
+		{"friction", "--quick", "--project", "forge", "Reviewing forge friction"},
+	} {
+		if err := Run(
+			context.Background(),
+			args,
+			quickCaptureRuntime(dataDirectory, &bytes.Buffer{}),
+			"dev",
+		); err != nil {
+			t.Fatalf("create record error = %v", err)
+		}
+	}
+	setListRecordStatus(t, dataDirectory, "frc_00000000000000000000000000000000", "reviewing")
+
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "spaced human",
+			args: []string{"list", "--status", "captured"},
+			want: "cap_00000000000000000000000000000000  capture  captured  Captured forge capture\n",
+		},
+		{
+			name: "equals JSON composes with type and project",
+			args: []string{"list", "--status=reviewing", "--type", "friction", "--project", "forge", "--json"},
+			want: "[{\"id\":\"frc_00000000000000000000000000000000\",\"type\":\"friction\",\"description\":\"Reviewing forge friction\",\"project\":\"forge\",\"status\":\"reviewing\",\"details\":{\"frequency\":\"unknown\",\"impact\":\"unknown\",\"category\":\"other\",\"current_workaround\":null},\"created_at\":\"2026-08-25T12:00:00.000000Z\",\"updated_at\":\"2026-08-25T12:00:00.000000Z\"}]\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			if err := Run(
+				context.Background(),
+				tt.args,
+				quickCaptureRuntime(dataDirectory, &stdout),
+				"dev",
+			); err != nil {
+				t.Fatalf("Run() error = %v", err)
+			}
+			if got := stdout.String(); got != tt.want {
+				t.Errorf("stdout = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestListUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 	for _, args := range [][]string{
 		{"list", "extra"},
@@ -268,6 +319,8 @@ func TestListUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 		{"list", "--type="},
 		{"list", "--project"},
 		{"list", "--project="},
+		{"list", "--status"},
+		{"list", "--status="},
 	} {
 		t.Run(args[1], func(t *testing.T) {
 			rt := quickCaptureRuntime(t.TempDir(), &bytes.Buffer{})
@@ -323,6 +376,22 @@ func TestListInvalidTypeDoesNotInspectEnvironment(t *testing.T) {
 	}
 }
 
+func TestListInvalidStatusDoesNotInspectEnvironment(t *testing.T) {
+	var stdout bytes.Buffer
+	rt := quickCaptureRuntime(t.TempDir(), &stdout)
+	rt.Env = func(string) string {
+		t.Fatal("invalid list status inspected environment")
+		return ""
+	}
+	err := Run(context.Background(), []string{"list", "--status", "pending"}, rt, "dev")
+	if err == nil || err.Error() != `invalid status "pending"` {
+		t.Fatalf("Run() error = %v, want invalid-status error", err)
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("stdout = %q, want empty", stdout.String())
+	}
+}
+
 func createListRecords(t *testing.T, dataDirectory string) {
 	t.Helper()
 	createRuntime := quickCaptureRuntime(dataDirectory, &bytes.Buffer{})
@@ -348,6 +417,30 @@ func createListRecords(t *testing.T, dataDirectory string) {
 		"dev",
 	); err != nil {
 		t.Fatalf("create friction error = %v", err)
+	}
+}
+
+func setListRecordStatus(t *testing.T, dataDirectory, id, status string) {
+	t.Helper()
+	session, err := storage.OpenExisting(
+		context.Background(),
+		filepath.Join(dataDirectory, "forge.db"),
+		os.Geteuid(),
+		storage.DatabaseReadWrite,
+	)
+	if err != nil {
+		t.Fatalf("OpenExisting() error = %v", err)
+	}
+	if _, err := session.Database().Exec(
+		`UPDATE records SET status = ? WHERE id = ?`,
+		status,
+		id,
+	); err != nil {
+		_ = session.Close()
+		t.Fatalf("update record status error = %v", err)
+	}
+	if err := session.Close(); err != nil {
+		t.Fatalf("Session.Close() error = %v", err)
 	}
 }
 
