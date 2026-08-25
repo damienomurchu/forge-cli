@@ -349,7 +349,8 @@ Current implementation status:
 - Phase 5 is in progress. The first quick-capture slice accepts `--quick` and one
   description, applies the `thought` default, and persists through the complete
   secure-storage lifecycle with human confirmation. Capture-specific help is
-  implemented as a data-free path with stable golden output.
+  implemented as a data-free path with stable golden output. Quick capture also
+  accepts an explicit kind using either supported long-flag syntax.
 - Phases 6 through 8 remain planned and unimplemented.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/damienomurchu/forge-cli/internal/config"
@@ -37,11 +38,12 @@ Flags:
 const captureHelp = `Capture a thought, idea, or observation.
 
 Usage:
-  forge capture --quick DESCRIPTION
+  forge capture --quick [--kind KIND] DESCRIPTION
 
 Flags:
-  -h, --help    Show help
-      --quick   Capture without prompting (currently required)
+  -h, --help       Show help
+      --kind KIND  Set capture kind (default: thought)
+      --quick      Capture without prompting (currently required)
 `
 
 // Runtime contains process facilities used by the CLI. Keeping them explicit
@@ -97,13 +99,13 @@ func runCapture(ctx context.Context, args []string, rt Runtime) error {
 		_, err := io.WriteString(rt.Stdout, captureHelp)
 		return err
 	}
-	description, err := parseQuickCapture(args)
+	options, err := parseQuickCapture(args)
 	if err != nil {
 		return err
 	}
 	record, err := domain.NewCapture(domain.CaptureInput{
-		Description: description,
-		Kind:        domain.CaptureKindThought,
+		Description: options.description,
+		Kind:        options.kind,
 	}, rt.Now(), rt.Random)
 	if err != nil {
 		return fmt.Errorf("create capture: %w", err)
@@ -145,32 +147,59 @@ func captureHelpRequested(args []string) bool {
 	return false
 }
 
-func parseQuickCapture(args []string) (string, error) {
+type quickCaptureOptions struct {
+	description string
+	kind        domain.CaptureKind
+}
+
+func parseQuickCapture(args []string) (quickCaptureOptions, error) {
 	quick := false
 	optionsEnded := false
 	positionals := make([]string, 0, 1)
-	for _, arg := range args {
+	kind := domain.CaptureKindThought
+	for index := 0; index < len(args); index++ {
+		arg := args[index]
 		switch {
 		case !optionsEnded && arg == "--":
 			optionsEnded = true
 		case !optionsEnded && arg == "--quick":
 			quick = true
+		case !optionsEnded && arg == "--kind":
+			if index+1 >= len(args) || strings.HasPrefix(args[index+1], "-") {
+				return quickCaptureOptions{}, &UsageError{Message: "--kind requires a value"}
+			}
+			index++
+			parsed, err := domain.ParseCaptureKind(args[index])
+			if err != nil {
+				return quickCaptureOptions{}, err
+			}
+			kind = parsed
+		case !optionsEnded && strings.HasPrefix(arg, "--kind="):
+			value := strings.TrimPrefix(arg, "--kind=")
+			if value == "" {
+				return quickCaptureOptions{}, &UsageError{Message: "--kind requires a value"}
+			}
+			parsed, err := domain.ParseCaptureKind(value)
+			if err != nil {
+				return quickCaptureOptions{}, err
+			}
+			kind = parsed
 		case !optionsEnded && len(arg) > 0 && arg[0] == '-':
-			return "", &UsageError{Argument: arg}
+			return quickCaptureOptions{}, &UsageError{Argument: arg}
 		default:
 			positionals = append(positionals, arg)
 		}
 	}
 	if len(positionals) == 0 {
-		return "", &UsageError{Message: "capture requires a description"}
+		return quickCaptureOptions{}, &UsageError{Message: "capture requires a description"}
 	}
 	if len(positionals) > 1 {
-		return "", &UsageError{Message: fmt.Sprintf("unexpected argument %q", positionals[1])}
+		return quickCaptureOptions{}, &UsageError{Message: fmt.Sprintf("unexpected argument %q", positionals[1])}
 	}
 	if !quick {
-		return "", &UsageError{Message: "capture currently requires --quick"}
+		return quickCaptureOptions{}, &UsageError{Message: "capture currently requires --quick"}
 	}
-	return positionals[0], nil
+	return quickCaptureOptions{description: positionals[0], kind: kind}, nil
 }
 
 // WriteError writes a concise user-facing error and returns its exit status.

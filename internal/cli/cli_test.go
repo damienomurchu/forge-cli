@@ -78,12 +78,12 @@ func TestCaptureHelp(t *testing.T) {
 }
 
 func TestCaptureHelpAfterOptionTerminatorIsDescription(t *testing.T) {
-	description, err := parseQuickCapture([]string{"--quick", "--", "--help"})
+	options, err := parseQuickCapture([]string{"--quick", "--", "--help"})
 	if err != nil {
 		t.Fatalf("parseQuickCapture() error = %v", err)
 	}
-	if description != "--help" {
-		t.Errorf("description = %q, want --help", description)
+	if options.description != "--help" {
+		t.Errorf("description = %q, want --help", options.description)
 	}
 }
 
@@ -194,6 +194,53 @@ func TestQuickCaptureAcceptsOptionTerminator(t *testing.T) {
 	}
 }
 
+func TestQuickCapturePersistsExplicitKind(t *testing.T) {
+	for _, args := range [][]string{
+		{"capture", "--quick", "--kind", "idea", "spaced kind"},
+		{"capture", "--quick", "--kind=idea", "equals kind"},
+	} {
+		t.Run(args[2], func(t *testing.T) {
+			dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+			var stdout bytes.Buffer
+			err := Run(
+				context.Background(),
+				args,
+				quickCaptureRuntime(dataDirectory, &stdout),
+				"dev",
+			)
+			if err != nil {
+				t.Fatalf("Run() error = %v", err)
+			}
+
+			session, err := storage.OpenExisting(
+				context.Background(),
+				filepath.Join(dataDirectory, "forge.db"),
+				os.Geteuid(),
+				storage.DatabaseReadOnly,
+			)
+			if err != nil {
+				t.Fatalf("OpenExisting() error = %v", err)
+			}
+			repo, err := repository.New(session.Database())
+			if err != nil {
+				_ = session.Close()
+				t.Fatalf("repository.New() error = %v", err)
+			}
+			record, err := repo.FindByID(context.Background(), domain.ID("cap_00000000000000000000000000000000"))
+			closeErr := session.Close()
+			if err != nil {
+				t.Fatalf("FindByID() error = %v", err)
+			}
+			if closeErr != nil {
+				t.Fatalf("Session.Close() error = %v", closeErr)
+			}
+			if record.Details.Capture.Kind != domain.CaptureKindIdea {
+				t.Errorf("stored kind = %q, want idea", record.Details.Capture.Kind)
+			}
+		})
+	}
+}
+
 func TestQuickCaptureUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -202,7 +249,9 @@ func TestQuickCaptureUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 	}{
 		{name: "missing description", args: []string{"capture", "--quick"}, wantErr: "capture requires a description"},
 		{name: "interactive not implemented", args: []string{"capture", "description"}, wantErr: "capture currently requires --quick"},
-		{name: "unknown flag", args: []string{"capture", "--quick", "--kind", "thought"}, wantErr: `unknown argument "--kind"`},
+		{name: "missing kind", args: []string{"capture", "--quick", "--kind"}, wantErr: `--kind requires a value`},
+		{name: "empty kind", args: []string{"capture", "--quick", "--kind=", "description"}, wantErr: `--kind requires a value`},
+		{name: "unknown flag", args: []string{"capture", "--quick", "--project", "forge", "description"}, wantErr: `unknown argument "--project"`},
 		{name: "extra description", args: []string{"capture", "--quick", "one", "two"}, wantErr: `unexpected argument "two"`},
 	}
 	for _, tt := range tests {
@@ -225,18 +274,30 @@ func TestQuickCaptureUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 }
 
 func TestQuickCaptureValidationHappensBeforeStorage(t *testing.T) {
-	dataDirectory := filepath.Join(t.TempDir(), "missing")
-	rt := quickCaptureRuntime(dataDirectory, &bytes.Buffer{})
-	rt.Env = func(string) string {
-		t.Fatal("invalid capture inspected environment")
-		return ""
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr string
+	}{
+		{name: "description", args: []string{"capture", "--quick", " \t "}, wantErr: "invalid description"},
+		{name: "kind", args: []string{"capture", "--quick", "--kind", "not-a-kind", "description"}, wantErr: `invalid capture kind "not-a-kind"`},
 	}
-	err := Run(context.Background(), []string{"capture", "--quick", " \t "}, rt, "dev")
-	if err == nil || !strings.Contains(err.Error(), "invalid description") {
-		t.Fatalf("Run() error = %v, want invalid-description error", err)
-	}
-	if _, statErr := os.Stat(dataDirectory); !errors.Is(statErr, os.ErrNotExist) {
-		t.Fatalf("data directory state error = %v, want not exist", statErr)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dataDirectory := filepath.Join(t.TempDir(), "missing")
+			rt := quickCaptureRuntime(dataDirectory, &bytes.Buffer{})
+			rt.Env = func(string) string {
+				t.Fatal("invalid capture inspected environment")
+				return ""
+			}
+			err := Run(context.Background(), tt.args, rt, "dev")
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("Run() error = %v, want error containing %q", err, tt.wantErr)
+			}
+			if _, statErr := os.Stat(dataDirectory); !errors.Is(statErr, os.ErrNotExist) {
+				t.Fatalf("data directory state error = %v, want not exist", statErr)
+			}
+		})
 	}
 }
 
