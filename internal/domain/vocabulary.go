@@ -4,7 +4,7 @@ package domain
 
 import "fmt"
 
-// InvalidValueError reports a value outside an approved domain vocabulary.
+// InvalidValueError reports a value that violates a domain rule.
 type InvalidValueError struct {
 	Field string
 	Value string
