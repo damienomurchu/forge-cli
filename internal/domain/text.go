@@ -21,3 +21,22 @@ func NormalizeOptionalText(value string) *string {
 	}
 	return &normalized
 }
+
+// NormalizeTags parses comma-separated tags, trims and lowercases each tag,
+// removes empty values and duplicates, and preserves first-seen order.
+func NormalizeTags(value string) []string {
+	tags := make([]string, 0)
+	seen := make(map[string]struct{})
+	for tag := range strings.SplitSeq(value, ",") {
+		tag = strings.ToLower(strings.TrimSpace(tag))
+		if tag == "" {
+			continue
+		}
+		if _, exists := seen[tag]; exists {
+			continue
+		}
+		seen[tag] = struct{}{}
+		tags = append(tags, tag)
+	}
+	return tags
+}

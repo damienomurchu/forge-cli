@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"slices"
 	"testing"
 )
 
@@ -76,6 +77,35 @@ func TestNormalizeOptionalText(t *testing.T) {
 			}
 			if *got != *tt.want {
 				t.Errorf("NormalizeOptionalText(%q) = %q, want %q", tt.input, *got, *tt.want)
+			}
+		})
+	}
+}
+
+func TestNormalizeTags(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  []string
+	}{
+		{name: "empty", input: "", want: []string{}},
+		{name: "empty entries", input: " ,\t,\u2003, ", want: []string{}},
+		{name: "single tag", input: "forge", want: []string{"forge"}},
+		{name: "trimmed and lowercased", input: " Forge , CLI ", want: []string{"forge", "cli"}},
+		{name: "Unicode lowercased", input: " CAFÉ , RÉSUMÉ ", want: []string{"café", "résumé"}},
+		{name: "duplicates removed", input: "Forge,cli,FORGE,CLI,forge", want: []string{"forge", "cli"}},
+		{name: "first-seen order retained", input: "third,first,second,first", want: []string{"third", "first", "second"}},
+		{name: "internal whitespace preserved", input: " build tools ,command  line", want: []string{"build tools", "command  line"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := NormalizeTags(tt.input)
+			if got == nil {
+				t.Fatalf("NormalizeTags(%q) = nil, want non-nil slice", tt.input)
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("NormalizeTags(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
 	}
