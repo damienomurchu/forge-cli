@@ -370,6 +370,8 @@ Current implementation status:
   deterministic newest-first ordering. This completes the contracted list command.
   Show is implemented as a strictly read-only lookup with opaque lexical ID
   validation, complete terminal-safe human output, and complete record JSON.
+  Update changes lifecycle status atomically against existing storage, preserves
+  timestamps on true no-ops, and returns concise human or complete JSON results.
 - Phases 6 through 8 remain planned and unimplemented.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.

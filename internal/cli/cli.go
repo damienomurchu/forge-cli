@@ -106,6 +106,17 @@ Flags:
       --json   Write the record as JSON
 `
 
+const updateHelp = `Update a record's lifecycle status.
+
+Usage:
+  forge update [--json] RECORD_ID --status STATUS
+
+Flags:
+  -h, --help          Show help
+      --json           Write the resulting record as JSON
+      --status STATUS  Set the lifecycle status
+`
+
 // Runtime contains process facilities used by the CLI. Keeping them explicit
 // makes command behavior deterministic in tests and keeps global process state
 // out of application code.
@@ -155,9 +166,135 @@ func Run(ctx context.Context, args []string, rt Runtime, version string) error {
 		return runList(ctx, args[1:], rt)
 	case len(args) > 0 && args[0] == "show":
 		return runShow(ctx, args[1:], rt)
+	case len(args) > 0 && args[0] == "update":
+		return runUpdate(ctx, args[1:], rt)
 	default:
 		return &UsageError{Argument: args[0]}
 	}
+}
+
+type updateCommandOptions struct {
+	id     domain.ID
+	status domain.Status
+	json   bool
+}
+
+func runUpdate(ctx context.Context, args []string, rt Runtime) error {
+	if commandHelpRequested(args) {
+		_, err := io.WriteString(rt.Stdout, updateHelp)
+		return err
+	}
+	options, err := parseUpdate(args)
+	if err != nil {
+		return err
+	}
+	databasePath, err := config.ResolveDatabasePath(rt.GOOS, rt.Env)
+	if err != nil {
+		return fmt.Errorf("resolve database path: %w", err)
+	}
+	session, err := storage.OpenExisting(ctx, databasePath, rt.EUID, storage.DatabaseReadWrite)
+	if errors.Is(err, storage.ErrStorageNotFound) {
+		return fmt.Errorf("record %q not found", options.id.String())
+	}
+	if err != nil {
+		return fmt.Errorf("open storage for update: %w", err)
+	}
+	repo, err := repository.New(session.Database())
+	if err != nil {
+		return errors.Join(err, session.Close())
+	}
+	record, _, err := repo.UpdateStatus(ctx, options.id, options.status, rt.Now())
+	if errors.Is(err, repository.ErrRecordNotFound) {
+		return errors.Join(fmt.Errorf("record %q not found", options.id.String()), session.Close())
+	}
+	if err != nil {
+		return errors.Join(err, session.Close())
+	}
+	if err := session.Close(); err != nil {
+		return fmt.Errorf("close storage after update: %w", err)
+	}
+	if err := writeUpdateResult(rt.Stdout, record, options.json); err != nil {
+		return fmt.Errorf("write update result: %w", err)
+	}
+	return nil
+}
+
+func parseUpdate(args []string) (updateCommandOptions, error) {
+	var options updateCommandOptions
+	idSet := false
+	statusSet := false
+	jsonSet := false
+	for index := 0; index < len(args); index++ {
+		arg := args[index]
+		switch {
+		case arg == "--json":
+			if jsonSet {
+				return updateCommandOptions{}, &UsageError{Message: "--json may only be specified once"}
+			}
+			jsonSet = true
+			options.json = true
+		case arg == "--status":
+			if statusSet {
+				return updateCommandOptions{}, &UsageError{Message: "--status may only be specified once"}
+			}
+			if index+1 >= len(args) || strings.HasPrefix(args[index+1], "-") {
+				return updateCommandOptions{}, &UsageError{Message: "--status requires a value"}
+			}
+			index++
+			status, err := domain.ParseStatus(args[index])
+			if err != nil {
+				return updateCommandOptions{}, err
+			}
+			statusSet = true
+			options.status = status
+		case strings.HasPrefix(arg, "--status="):
+			if statusSet {
+				return updateCommandOptions{}, &UsageError{Message: "--status may only be specified once"}
+			}
+			value := strings.TrimPrefix(arg, "--status=")
+			if value == "" {
+				return updateCommandOptions{}, &UsageError{Message: "--status requires a value"}
+			}
+			status, err := domain.ParseStatus(value)
+			if err != nil {
+				return updateCommandOptions{}, err
+			}
+			statusSet = true
+			options.status = status
+		case strings.HasPrefix(arg, "-"):
+			return updateCommandOptions{}, &UsageError{Argument: arg}
+		case idSet:
+			return updateCommandOptions{}, &UsageError{Argument: arg}
+		default:
+			options.id = domain.ID(arg)
+			idSet = true
+		}
+	}
+	if !idSet {
+		return updateCommandOptions{}, &UsageError{Message: "record ID is required"}
+	}
+	if !statusSet {
+		return updateCommandOptions{}, &UsageError{Message: "--status is required"}
+	}
+	if err := validateLookupID(options.id); err != nil {
+		return updateCommandOptions{}, err
+	}
+	return options, nil
+}
+
+func writeUpdateResult(w io.Writer, record domain.Record, jsonOutput bool) error {
+	var rendered bytes.Buffer
+	var err error
+	if jsonOutput {
+		err = output.WriteRecordJSON(&rendered, record)
+	} else {
+		err = output.WriteUpdated(&rendered, record)
+	}
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(w, &rendered)
+	return err
 }
 
 func runShow(ctx context.Context, args []string, rt Runtime) error {

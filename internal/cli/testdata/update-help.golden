@@ -1,0 +1,9 @@
+Update a record's lifecycle status.
+
+Usage:
+  forge update [--json] RECORD_ID --status STATUS
+
+Flags:
+  -h, --help          Show help
+      --json           Write the resulting record as JSON
+      --status STATUS  Set the lifecycle status
