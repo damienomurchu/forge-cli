@@ -353,6 +353,7 @@ Current implementation status:
   accepts explicit kind and optional normalized project values using either
   supported long-flag syntax. Comma-separated capture tags are normalized,
   deduplicated in first-seen order, and persisted using both long-flag forms.
+  Quick capture supports exclusive, newline-terminated record JSON output.
 - Phases 6 through 8 remain planned and unimplemented.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.

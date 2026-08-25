@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -334,6 +335,36 @@ func TestQuickCaptureNormalizesAndPersistsTags(t *testing.T) {
 	}
 }
 
+func TestQuickCaptureWritesJSONRecord(t *testing.T) {
+	dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+	var stdout bytes.Buffer
+	err := Run(
+		context.Background(),
+		[]string{
+			"capture", "--quick", "--json", "--project", "forge",
+			"--kind=observation", "--tags", "Performance,CLI",
+			"Measure command startup time",
+		},
+		quickCaptureRuntime(dataDirectory, &stdout),
+		"dev",
+	)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	want := "{\"id\":\"cap_00000000000000000000000000000000\",\"type\":\"capture\",\"description\":\"Measure command startup time\",\"project\":\"forge\",\"status\":\"captured\",\"details\":{\"kind\":\"observation\",\"tags\":[\"performance\",\"cli\"]},\"created_at\":\"2026-08-25T12:00:00.000000Z\",\"updated_at\":\"2026-08-25T12:00:00.000000Z\"}\n"
+	if got := stdout.String(); got != want {
+		t.Errorf("stdout = %q, want %q", got, want)
+	}
+	if strings.Contains(stdout.String(), "Created capture") {
+		t.Errorf("JSON stdout contains human confirmation: %q", stdout.String())
+	}
+
+	record := readQuickCapture(t, dataDirectory)
+	if record.Description != "Measure command startup time" {
+		t.Errorf("stored description = %q, want JSON capture description", record.Description)
+	}
+}
+
 func TestQuickCaptureUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -346,7 +377,7 @@ func TestQuickCaptureUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 		{name: "empty kind", args: []string{"capture", "--quick", "--kind=", "description"}, wantErr: `--kind requires a value`},
 		{name: "missing project", args: []string{"capture", "--quick", "--project"}, wantErr: `--project requires a value`},
 		{name: "missing tags", args: []string{"capture", "--quick", "--tags"}, wantErr: `--tags requires a value`},
-		{name: "unknown flag", args: []string{"capture", "--quick", "--json", "description"}, wantErr: `unknown argument "--json"`},
+		{name: "unknown flag", args: []string{"capture", "--quick", "--unknown", "description"}, wantErr: `unknown argument "--unknown"`},
 		{name: "extra description", args: []string{"capture", "--quick", "one", "two"}, wantErr: `unexpected argument "two"`},
 	}
 	for _, tt := range tests {
@@ -374,13 +405,14 @@ func TestQuickCaptureValidationHappensBeforeStorage(t *testing.T) {
 		args    []string
 		wantErr string
 	}{
-		{name: "description", args: []string{"capture", "--quick", " \t "}, wantErr: "invalid description"},
-		{name: "kind", args: []string{"capture", "--quick", "--kind", "not-a-kind", "description"}, wantErr: `invalid capture kind "not-a-kind"`},
+		{name: "description", args: []string{"capture", "--quick", "--json", " \t "}, wantErr: "invalid description"},
+		{name: "kind", args: []string{"capture", "--quick", "--json", "--kind", "not-a-kind", "description"}, wantErr: `invalid capture kind "not-a-kind"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dataDirectory := filepath.Join(t.TempDir(), "missing")
-			rt := quickCaptureRuntime(dataDirectory, &bytes.Buffer{})
+			var stdout bytes.Buffer
+			rt := quickCaptureRuntime(dataDirectory, &stdout)
 			rt.Env = func(string) string {
 				t.Fatal("invalid capture inspected environment")
 				return ""
@@ -392,19 +424,31 @@ func TestQuickCaptureValidationHappensBeforeStorage(t *testing.T) {
 			if _, statErr := os.Stat(dataDirectory); !errors.Is(statErr, os.ErrNotExist) {
 				t.Fatalf("data directory state error = %v, want not exist", statErr)
 			}
+			if stdout.Len() != 0 {
+				t.Errorf("stdout = %q, want empty", stdout.String())
+			}
 		})
 	}
 }
 
 func TestQuickCaptureStorageFailureProducesNoOutput(t *testing.T) {
-	var stdout bytes.Buffer
-	rt := quickCaptureRuntime("relative", &stdout)
-	err := Run(context.Background(), []string{"capture", "--quick", "description"}, rt, "dev")
-	if err == nil || !strings.Contains(err.Error(), "FORGE_DATA_DIR must be an absolute path") {
-		t.Fatalf("Run() error = %v, want path error", err)
-	}
-	if stdout.Len() != 0 {
-		t.Errorf("stdout = %q, want empty", stdout.String())
+	for _, jsonFlag := range []bool{false, true} {
+		t.Run(fmt.Sprintf("json=%t", jsonFlag), func(t *testing.T) {
+			var stdout bytes.Buffer
+			rt := quickCaptureRuntime("relative", &stdout)
+			args := []string{"capture", "--quick"}
+			if jsonFlag {
+				args = append(args, "--json")
+			}
+			args = append(args, "description")
+			err := Run(context.Background(), args, rt, "dev")
+			if err == nil || !strings.Contains(err.Error(), "FORGE_DATA_DIR must be an absolute path") {
+				t.Fatalf("Run() error = %v, want path error", err)
+			}
+			if stdout.Len() != 0 {
+				t.Errorf("stdout = %q, want empty", stdout.String())
+			}
+		})
 	}
 }
 

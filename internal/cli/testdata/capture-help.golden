@@ -2,7 +2,7 @@ Capture a thought, idea, or observation.
 
 Usage:
   forge capture --quick [--project PROJECT] [--kind KIND]
-                [--tags TAGS] DESCRIPTION
+                [--tags TAGS] [--json] DESCRIPTION
 
 Flags:
   -h, --help             Show help
@@ -10,3 +10,4 @@ Flags:
       --project PROJECT  Associate the capture with a project
       --quick            Capture without prompting (currently required)
       --tags TAGS        Add comma-separated tags
+      --json             Write the created record as JSON

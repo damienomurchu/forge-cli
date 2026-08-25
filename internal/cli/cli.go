@@ -2,6 +2,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -39,7 +40,7 @@ const captureHelp = `Capture a thought, idea, or observation.
 
 Usage:
   forge capture --quick [--project PROJECT] [--kind KIND]
-                [--tags TAGS] DESCRIPTION
+                [--tags TAGS] [--json] DESCRIPTION
 
 Flags:
   -h, --help             Show help
@@ -47,6 +48,7 @@ Flags:
       --project PROJECT  Associate the capture with a project
       --quick            Capture without prompting (currently required)
       --tags TAGS        Add comma-separated tags
+      --json             Write the created record as JSON
 `
 
 // Runtime contains process facilities used by the CLI. Keeping them explicit
@@ -134,6 +136,16 @@ func runCapture(ctx context.Context, args []string, rt Runtime) error {
 	if err := session.Close(); err != nil {
 		return fmt.Errorf("close storage after capture: %w", err)
 	}
+	if options.json {
+		var rendered bytes.Buffer
+		if err := output.WriteRecordJSON(&rendered, record); err != nil {
+			return fmt.Errorf("render capture result: %w", err)
+		}
+		if _, err := io.Copy(rt.Stdout, &rendered); err != nil {
+			return fmt.Errorf("write capture result: %w", err)
+		}
+		return nil
+	}
 	if err := output.WriteCreated(rt.Stdout, record); err != nil {
 		return fmt.Errorf("write capture result: %w", err)
 	}
@@ -157,6 +169,7 @@ type quickCaptureOptions struct {
 	project     string
 	kind        domain.CaptureKind
 	tags        string
+	json        bool
 }
 
 func parseQuickCapture(args []string) (quickCaptureOptions, error) {
@@ -166,6 +179,7 @@ func parseQuickCapture(args []string) (quickCaptureOptions, error) {
 	kind := domain.CaptureKindThought
 	project := ""
 	tags := ""
+	jsonOutput := false
 	for index := 0; index < len(args); index++ {
 		arg := args[index]
 		switch {
@@ -173,6 +187,8 @@ func parseQuickCapture(args []string) (quickCaptureOptions, error) {
 			optionsEnded = true
 		case !optionsEnded && arg == "--quick":
 			quick = true
+		case !optionsEnded && arg == "--json":
+			jsonOutput = true
 		case !optionsEnded && arg == "--kind":
 			if index+1 >= len(args) || strings.HasPrefix(args[index+1], "-") {
 				return quickCaptureOptions{}, &UsageError{Message: "--kind requires a value"}
@@ -229,6 +245,7 @@ func parseQuickCapture(args []string) (quickCaptureOptions, error) {
 		project:     project,
 		kind:        kind,
 		tags:        tags,
+		json:        jsonOutput,
 	}, nil
 }
 
