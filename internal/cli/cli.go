@@ -55,7 +55,8 @@ const frictionHelp = `Record recurring friction.
 
 Usage:
   forge friction --quick [--project PROJECT] [--frequency FREQUENCY]
-                 [--impact IMPACT] [--category CATEGORY] DESCRIPTION
+                 [--impact IMPACT] [--category CATEGORY]
+                 [--current-workaround TEXT] DESCRIPTION
 
 Defaults in quick mode:
   frequency  unknown
@@ -63,12 +64,13 @@ Defaults in quick mode:
   category   other
 
 Flags:
-  -h, --help                 Show help
-      --category CATEGORY    Set friction category (default: other)
-      --frequency FREQUENCY  Set occurrence frequency (default: unknown)
-      --impact IMPACT        Set severity (default: unknown)
-      --project PROJECT      Associate the friction with a project
-      --quick                Record without prompting (currently required)
+  -h, --help                     Show help
+      --category CATEGORY        Set friction category (default: other)
+      --current-workaround TEXT  Record the current workaround
+      --frequency FREQUENCY      Set occurrence frequency (default: unknown)
+      --impact IMPACT            Set severity (default: unknown)
+      --project PROJECT          Associate the friction with a project
+      --quick                    Record without prompting (currently required)
 `
 
 // Runtime contains process facilities used by the CLI. Keeping them explicit
@@ -131,11 +133,12 @@ func runFriction(ctx context.Context, args []string, rt Runtime) error {
 		return err
 	}
 	record, err := domain.NewFriction(domain.FrictionInput{
-		Description: options.description,
-		Project:     options.project,
-		Frequency:   options.frequency,
-		Impact:      options.impact,
-		Category:    options.category,
+		Description:       options.description,
+		Project:           options.project,
+		Frequency:         options.frequency,
+		Impact:            options.impact,
+		Category:          options.category,
+		CurrentWorkaround: options.currentWorkaround,
 	}, rt.Now(), rt.Random)
 	if err != nil {
 		return fmt.Errorf("create friction: %w", err)
@@ -166,11 +169,12 @@ func runFriction(ctx context.Context, args []string, rt Runtime) error {
 }
 
 type quickFrictionOptions struct {
-	description string
-	project     string
-	frequency   domain.Frequency
-	impact      domain.Impact
-	category    domain.Category
+	description       string
+	project           string
+	frequency         domain.Frequency
+	impact            domain.Impact
+	category          domain.Category
+	currentWorkaround string
 }
 
 func parseQuickFriction(args []string) (quickFrictionOptions, error) {
@@ -181,6 +185,7 @@ func parseQuickFriction(args []string) (quickFrictionOptions, error) {
 	impact := domain.ImpactUnknown
 	category := domain.CategoryOther
 	project := ""
+	currentWorkaround := ""
 	for index := 0; index < len(args); index++ {
 		arg := args[index]
 		switch {
@@ -256,6 +261,14 @@ func parseQuickFriction(args []string) (quickFrictionOptions, error) {
 			project = args[index]
 		case !optionsEnded && strings.HasPrefix(arg, "--project="):
 			project = strings.TrimPrefix(arg, "--project=")
+		case !optionsEnded && arg == "--current-workaround":
+			if index+1 >= len(args) || strings.HasPrefix(args[index+1], "-") {
+				return quickFrictionOptions{}, &UsageError{Message: "--current-workaround requires a value"}
+			}
+			index++
+			currentWorkaround = args[index]
+		case !optionsEnded && strings.HasPrefix(arg, "--current-workaround="):
+			currentWorkaround = strings.TrimPrefix(arg, "--current-workaround=")
 		case !optionsEnded && strings.HasPrefix(arg, "-"):
 			return quickFrictionOptions{}, &UsageError{Argument: arg}
 		default:
@@ -272,11 +285,12 @@ func parseQuickFriction(args []string) (quickFrictionOptions, error) {
 		return quickFrictionOptions{}, &UsageError{Message: "friction currently requires --quick"}
 	}
 	return quickFrictionOptions{
-		description: positionals[0],
-		project:     project,
-		frequency:   frequency,
-		impact:      impact,
-		category:    category,
+		description:       positionals[0],
+		project:           project,
+		frequency:         frequency,
+		impact:            impact,
+		category:          category,
+		currentWorkaround: currentWorkaround,
 	}, nil
 }
 

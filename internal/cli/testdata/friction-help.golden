@@ -2,7 +2,8 @@ Record recurring friction.
 
 Usage:
   forge friction --quick [--project PROJECT] [--frequency FREQUENCY]
-                 [--impact IMPACT] [--category CATEGORY] DESCRIPTION
+                 [--impact IMPACT] [--category CATEGORY]
+                 [--current-workaround TEXT] DESCRIPTION
 
 Defaults in quick mode:
   frequency  unknown
@@ -10,9 +11,10 @@ Defaults in quick mode:
   category   other
 
 Flags:
-  -h, --help                 Show help
-      --category CATEGORY    Set friction category (default: other)
-      --frequency FREQUENCY  Set occurrence frequency (default: unknown)
-      --impact IMPACT        Set severity (default: unknown)
-      --project PROJECT      Associate the friction with a project
-      --quick                Record without prompting (currently required)
+  -h, --help                     Show help
+      --category CATEGORY        Set friction category (default: other)
+      --current-workaround TEXT  Record the current workaround
+      --frequency FREQUENCY      Set occurrence frequency (default: unknown)
+      --impact IMPACT            Set severity (default: unknown)
+      --project PROJECT          Associate the friction with a project
+      --quick                    Record without prompting (currently required)

@@ -220,6 +220,54 @@ func TestQuickFrictionNormalizesAndPersistsProject(t *testing.T) {
 	}
 }
 
+func TestQuickFrictionNormalizesAndPersistsCurrentWorkaround(t *testing.T) {
+	tests := []struct {
+		name           string
+		args           []string
+		wantWorkaround *string
+	}{
+		{
+			name:           "spaced flag",
+			args:           []string{"friction", "--quick", "--current-workaround", "  Search logs manually  ", "spaced workaround"},
+			wantWorkaround: stringPointer("Search logs manually"),
+		},
+		{
+			name:           "equals flag",
+			args:           []string{"friction", "--quick", "--current-workaround=Search logs manually", "equals workaround"},
+			wantWorkaround: stringPointer("Search logs manually"),
+		},
+		{
+			name:           "empty workaround",
+			args:           []string{"friction", "--quick", "--current-workaround=  ", "empty workaround"},
+			wantWorkaround: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+			var stdout bytes.Buffer
+			err := Run(
+				context.Background(),
+				tt.args,
+				quickCaptureRuntime(dataDirectory, &stdout),
+				"dev",
+			)
+			if err != nil {
+				t.Fatalf("Run() error = %v", err)
+			}
+
+			workaround := readQuickFriction(t, dataDirectory).Details.Friction.CurrentWorkaround
+			if tt.wantWorkaround == nil {
+				if workaround != nil {
+					t.Errorf("stored workaround = %q, want nil", *workaround)
+				}
+			} else if workaround == nil || *workaround != *tt.wantWorkaround {
+				t.Errorf("stored workaround = %v, want %q", workaround, *tt.wantWorkaround)
+			}
+		})
+	}
+}
+
 func TestQuickFrictionUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -235,7 +283,8 @@ func TestQuickFrictionUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 		{name: "missing category", args: []string{"friction", "--quick", "--category"}, wantErr: `--category requires a value`},
 		{name: "empty category", args: []string{"friction", "--quick", "--category=", "description"}, wantErr: `--category requires a value`},
 		{name: "missing project", args: []string{"friction", "--quick", "--project"}, wantErr: `--project requires a value`},
-		{name: "unknown flag", args: []string{"friction", "--quick", "--current-workaround", "manual", "description"}, wantErr: `unknown argument "--current-workaround"`},
+		{name: "missing current workaround", args: []string{"friction", "--quick", "--current-workaround"}, wantErr: `--current-workaround requires a value`},
+		{name: "unknown flag", args: []string{"friction", "--quick", "--json", "description"}, wantErr: `unknown argument "--json"`},
 		{name: "extra description", args: []string{"friction", "--quick", "one", "two"}, wantErr: `unexpected argument "two"`},
 	}
 	for _, tt := range tests {
