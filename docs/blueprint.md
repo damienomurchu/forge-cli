@@ -326,6 +326,15 @@ The archived Python release process and artifacts are not part of this release.
 Complete and verify one phase before starting the next unless explicitly asked to
 continue.
 
+Current implementation status:
+
+- Phases 0 through 2 are complete: product contracts, dependency risk spikes, the
+  performance harness, and the data-free help/version shell are established.
+- Phase 3, domain and presentation, is next.
+- Phases 4 through 8 remain planned and unimplemented.
+- The top-level help previews the approved command surface; it does not mean the
+  data-backed commands are implemented.
+
 ### Phase 0: Product specification
 
 - Confirm the command surface, terminology, defaults, output principles, exit-code
