@@ -11,7 +11,8 @@ and initial presentation layer are established. Phase 3 completed the validated
 record model, deterministic JSON, and terminal-safe human output foundations.
 Phase 4 secure storage work now includes centralized database path resolution and
 secure preparation and opening of owned, private data directories and database
-files. SQLite connection setup is next.
+files, plus single-connection SQLite setup with required pragmas. Transactional
+migrations are next.
 
 ### Command availability
 

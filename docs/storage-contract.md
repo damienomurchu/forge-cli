@@ -222,5 +222,11 @@ file; create mode atomically opens or creates it with mode `0600`. Every mode
 rejects symbolic links and non-regular files, verifies effective-user ownership
 before correcting permissions to `0600`, and returns a verified open handle.
 
+SQLite reopens only an already-created, verified database in `ro` or `rw` mode;
+it is never allowed to create the file itself. Forge brackets the driver's path
+open with descriptor-relative identity checks so a changed file is rejected. Each
+handle permits at most one physical connection at a time and configures foreign
+keys plus the `250 ms` busy timeout on every connection.
+
 Importing the archived Python database is outside this schema. If demand exists,
 provide an explicit importer that validates and converts records into this model.
