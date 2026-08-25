@@ -1,0 +1,9 @@
+ID: cap_7c6b1d85d8ec46e4a4f975e182bf8109
+Type: capture
+Description: Measure command startup time
+Project: forge
+Status: captured
+Kind: observation
+Tags: performance, cli
+Created: 2026-08-25T09:14:03.123456Z
+Updated: 2026-08-25T09:14:03.123456Z

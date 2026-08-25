@@ -1,0 +1,11 @@
+ID: frc_f2308c1797cf4e77ac076e6af5ff1616
+Type: friction
+Description: Releases require repeated manual checks
+Project: -
+Status: reviewing
+Frequency: monthly
+Impact: high
+Category: verification
+Current workaround: -
+Created: 2026-08-25T09:18:41.654321Z
+Updated: 2026-08-26T11:02:19.000000Z

@@ -368,6 +368,8 @@ Current implementation status:
   status filters, a normalized project filter, and a positive result limit. The
   filters compose with AND semantics, and the limit applies after filtering and
   deterministic newest-first ordering. This completes the contracted list command.
+  Show is implemented as a strictly read-only lookup with opaque lexical ID
+  validation, complete terminal-safe human output, and complete record JSON.
 - Phases 6 through 8 remain planned and unimplemented.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.

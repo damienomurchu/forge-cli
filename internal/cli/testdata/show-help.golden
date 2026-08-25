@@ -1,0 +1,8 @@
+Show one complete record.
+
+Usage:
+  forge show [--json] RECORD_ID
+
+Flags:
+  -h, --help  Show help
+      --json   Write the record as JSON

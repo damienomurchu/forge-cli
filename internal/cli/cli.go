@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/damienomurchu/forge-cli/internal/config"
 	"github.com/damienomurchu/forge-cli/internal/domain"
@@ -95,6 +96,16 @@ Flags:
       --type TYPE        Filter by capture or friction
 `
 
+const showHelp = `Show one complete record.
+
+Usage:
+  forge show [--json] RECORD_ID
+
+Flags:
+  -h, --help  Show help
+      --json   Write the record as JSON
+`
+
 // Runtime contains process facilities used by the CLI. Keeping them explicit
 // makes command behavior deterministic in tests and keeps global process state
 // out of application code.
@@ -142,9 +153,105 @@ func Run(ctx context.Context, args []string, rt Runtime, version string) error {
 		return runFriction(ctx, args[1:], rt)
 	case len(args) > 0 && args[0] == "list":
 		return runList(ctx, args[1:], rt)
+	case len(args) > 0 && args[0] == "show":
+		return runShow(ctx, args[1:], rt)
 	default:
 		return &UsageError{Argument: args[0]}
 	}
+}
+
+func runShow(ctx context.Context, args []string, rt Runtime) error {
+	if commandHelpRequested(args) {
+		_, err := io.WriteString(rt.Stdout, showHelp)
+		return err
+	}
+	id, jsonOutput, err := parseShow(args)
+	if err != nil {
+		return err
+	}
+	databasePath, err := config.ResolveDatabasePath(rt.GOOS, rt.Env)
+	if err != nil {
+		return fmt.Errorf("resolve database path: %w", err)
+	}
+	session, err := storage.OpenExisting(ctx, databasePath, rt.EUID, storage.DatabaseReadOnly)
+	if errors.Is(err, storage.ErrStorageNotFound) {
+		return fmt.Errorf("record %q not found", id.String())
+	}
+	if err != nil {
+		return fmt.Errorf("open storage for show: %w", err)
+	}
+	repo, err := repository.New(session.Database())
+	if err != nil {
+		return errors.Join(err, session.Close())
+	}
+	record, err := repo.FindByID(ctx, id)
+	if errors.Is(err, repository.ErrRecordNotFound) {
+		return errors.Join(fmt.Errorf("record %q not found", id.String()), session.Close())
+	}
+	if err != nil {
+		return errors.Join(err, session.Close())
+	}
+	if err := session.Close(); err != nil {
+		return fmt.Errorf("close storage after show: %w", err)
+	}
+	if err := writeShowResult(rt.Stdout, record, jsonOutput); err != nil {
+		return fmt.Errorf("write show result: %w", err)
+	}
+	return nil
+}
+
+func parseShow(args []string) (domain.ID, bool, error) {
+	var id domain.ID
+	idSet := false
+	jsonOutput := false
+	for _, arg := range args {
+		switch {
+		case arg == "--json":
+			jsonOutput = true
+		case strings.HasPrefix(arg, "-"):
+			return "", false, &UsageError{Argument: arg}
+		case idSet:
+			return "", false, &UsageError{Argument: arg}
+		default:
+			id = domain.ID(arg)
+			idSet = true
+		}
+	}
+	if !idSet {
+		return "", false, &UsageError{Message: "record ID is required"}
+	}
+	if err := validateLookupID(id); err != nil {
+		return "", false, err
+	}
+	return id, jsonOutput, nil
+}
+
+func validateLookupID(id domain.ID) error {
+	value := id.String()
+	if strings.TrimSpace(value) == "" || strings.TrimSpace(value) != value {
+		return &domain.InvalidValueError{Field: "record ID", Value: value}
+	}
+	for _, character := range value {
+		if unicode.IsControl(character) {
+			return &domain.InvalidValueError{Field: "record ID", Value: value}
+		}
+	}
+	return nil
+}
+
+func writeShowResult(w io.Writer, record domain.Record, jsonOutput bool) error {
+	var rendered bytes.Buffer
+	var err error
+	if jsonOutput {
+		err = output.WriteRecordJSON(&rendered, record)
+	} else {
+		err = output.WriteRecord(&rendered, record)
+	}
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(w, &rendered)
+	return err
 }
 
 func runList(ctx context.Context, args []string, rt Runtime) error {

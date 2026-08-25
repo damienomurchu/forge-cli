@@ -3,9 +3,59 @@ package output
 import (
 	"bytes"
 	"io"
+	"strings"
 
 	"github.com/damienomurchu/forge-cli/internal/domain"
 )
+
+// WriteRecord writes a complete terminal-safe human representation of one
+// record. Validation completes before any output is written.
+func WriteRecord(w io.Writer, record domain.Record) error {
+	if err := record.Validate(); err != nil {
+		return err
+	}
+
+	var rendered bytes.Buffer
+	writeField := func(label, value string) {
+		rendered.WriteString(label)
+		rendered.WriteString(": ")
+		rendered.WriteString(value)
+		rendered.WriteByte('\n')
+	}
+	writeField("ID", EscapeText(record.ID.String()))
+	writeField("Type", record.Type.String())
+	writeField("Description", EscapeText(record.Description))
+	writeField("Project", escapedOptionalText(record.Project))
+	writeField("Status", record.Status.String())
+	if record.Type == domain.RecordTypeCapture {
+		writeField("Kind", record.Details.Capture.Kind.String())
+		tags := make([]string, len(record.Details.Capture.Tags))
+		for index, tag := range record.Details.Capture.Tags {
+			tags[index] = EscapeText(tag)
+		}
+		if len(tags) == 0 {
+			writeField("Tags", "-")
+		} else {
+			writeField("Tags", strings.Join(tags, ", "))
+		}
+	} else {
+		writeField("Frequency", record.Details.Friction.Frequency.String())
+		writeField("Impact", record.Details.Friction.Impact.String())
+		writeField("Category", record.Details.Friction.Category.String())
+		writeField("Current workaround", escapedOptionalText(record.Details.Friction.CurrentWorkaround))
+	}
+	writeField("Created", record.CreatedAt.String())
+	writeField("Updated", record.UpdatedAt.String())
+	_, err := io.Copy(w, &rendered)
+	return err
+}
+
+func escapedOptionalText(value *string) string {
+	if value == nil {
+		return "-"
+	}
+	return EscapeText(*value)
+}
 
 // WriteRecordList writes a compact terminal-safe line for each record in the
 // provided order. Every record is validated before any output is written.
