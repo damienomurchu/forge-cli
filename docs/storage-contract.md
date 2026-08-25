@@ -229,6 +229,11 @@ The update command may open an existing writable database but does not initializ
 a missing database or apply migrations. A future explicit migration command may be
 added if automatic migration during record creation proves insufficient.
 
+The open-existing lifecycle owns the verified directory handle, database-file
+handle, and configured SQLite pool, closing them in reverse order. It supports
+read-only and read-write access, classifies missing storage, rejects any schema
+that is not current, and never creates storage or applies migrations.
+
 ## Index policy
 
 The initial indexes correspond to newest-first listing and individual type, status,

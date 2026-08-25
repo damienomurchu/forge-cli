@@ -18,7 +18,8 @@ newest-first repository listing supports type, project, status, and limit filter
 Atomic repository status updates are also implemented. The specialized review
 query is implemented, completing the planned repository surface. Secure storage
 now has distinct create-or-open and open-existing directory primitives; lifecycle
-assembly is next.
+assembly has begun with owned, schema-checked open-existing sessions. The
+create-and-migrate lifecycle is next.
 
 ### Command availability
 

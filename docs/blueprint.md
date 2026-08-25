@@ -344,7 +344,8 @@ Current implementation status:
   implemented, along with atomic status updates. The specialized review query is
   also implemented, completing the planned repository surface. Secure storage
   now distinguishes create-or-open from open-existing directory access; lifecycle
-  assembly is next.
+  assembly has begun with owned, schema-checked open-existing sessions. The
+  create-and-migrate lifecycle is next.
 - Phases 5 through 8 remain planned and unimplemented.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.
