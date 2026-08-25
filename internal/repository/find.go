@@ -21,6 +21,10 @@ type rowScanner interface {
 	Scan(dest ...any) error
 }
 
+type recordQueryer interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+}
+
 type storedRecord struct {
 	id                string
 	recordType        string
@@ -76,6 +80,10 @@ func scanStoredRecord(scanner rowScanner) (storedRecord, error) {
 }
 
 func (r *Repository) decodeStoredRecord(ctx context.Context, stored storedRecord) (domain.Record, error) {
+	return decodeStoredRecord(ctx, r.db, stored)
+}
+
+func decodeStoredRecord(ctx context.Context, queryer recordQueryer, stored storedRecord) (domain.Record, error) {
 	recordType, err := domain.ParseRecordType(stored.recordType)
 	if err != nil {
 		return domain.Record{}, err
@@ -114,7 +122,7 @@ func (r *Repository) decodeStoredRecord(ctx context.Context, stored storedRecord
 		if err != nil {
 			return domain.Record{}, err
 		}
-		tags, err := r.loadCaptureTags(ctx, record.ID)
+		tags, err := loadCaptureTags(ctx, queryer, record.ID)
 		if err != nil {
 			return domain.Record{}, err
 		}
@@ -150,8 +158,8 @@ func (r *Repository) decodeStoredRecord(ctx context.Context, stored storedRecord
 	return record, nil
 }
 
-func (r *Repository) loadCaptureTags(ctx context.Context, id domain.ID) ([]string, error) {
-	rows, err := r.db.QueryContext(ctx,
+func loadCaptureTags(ctx context.Context, queryer recordQueryer, id domain.ID) ([]string, error) {
+	rows, err := queryer.QueryContext(ctx,
 		`SELECT position, tag FROM record_tags WHERE record_id = ? ORDER BY position ASC`,
 		id.String(),
 	)

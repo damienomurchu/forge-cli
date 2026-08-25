@@ -205,6 +205,11 @@ by a non-null empty collection, and one malformed row fails the whole operation.
 Optional type, project, and status filters combine with AND semantics, and an
 optional positive limit is applied after filtering and deterministic ordering.
 
+Status updates read and validate the complete record inside one transaction. A
+real change updates only `status` and `updated_at` atomically; a request for the
+stored status performs no write and preserves the original timestamp. Missing IDs,
+invalid timestamps, and database failures leave the record unchanged.
+
 ## Initialization and read-only commands
 
 Only commands that create records may create the data directory, database, or

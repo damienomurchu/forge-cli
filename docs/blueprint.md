@@ -341,7 +341,8 @@ Current implementation status:
   connection setup with required pragmas is implemented; transactional migrations
   and transactional capture and friction insertion are also implemented.
   Repository lookup by record ID and filtered newest-first listing are
-  implemented; repository status updates are next.
+  implemented, along with atomic status updates. The specialized review query is
+  next.
 - Phases 5 through 8 remain planned and unimplemented.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.

@@ -15,7 +15,8 @@ files, plus single-connection SQLite setup with required pragmas. Transactional
 migration inspection and application are also implemented. Repository creation is
 implemented for both captures and friction, and lookup by record ID is implemented;
 newest-first repository listing supports type, project, status, and limit filters.
-Repository status updates are next.
+Atomic repository status updates are also implemented. The specialized review
+query is next.
 
 ### Command availability
 
