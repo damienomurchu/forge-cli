@@ -6,7 +6,14 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/damienomurchu/forge-cli/internal/domain"
+	"github.com/damienomurchu/forge-cli/internal/repository"
+	"github.com/damienomurchu/forge-cli/internal/storage"
 )
 
 func TestHelp(t *testing.T) {
@@ -88,6 +95,136 @@ func TestWriteErrorMapsOperationalFailure(t *testing.T) {
 	}
 	if got, want := stderr.String(), "forge: write failed\n"; got != want {
 		t.Errorf("stderr = %q, want %q", got, want)
+	}
+}
+
+func TestQuickCaptureCreatesRecord(t *testing.T) {
+	dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+	var stdout bytes.Buffer
+	rt := quickCaptureRuntime(dataDirectory, &stdout)
+
+	err := Run(context.Background(), []string{"capture", "--quick", "  Investigate startup cost  "}, rt, "dev")
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	const id = "cap_00000000000000000000000000000000"
+	if got, want := stdout.String(), "Created capture "+id+"\n"; got != want {
+		t.Errorf("stdout = %q, want %q", got, want)
+	}
+
+	session, err := storage.OpenExisting(
+		context.Background(),
+		filepath.Join(dataDirectory, "forge.db"),
+		os.Geteuid(),
+		storage.DatabaseReadOnly,
+	)
+	if err != nil {
+		t.Fatalf("OpenExisting() error = %v", err)
+	}
+	t.Cleanup(func() { _ = session.Close() })
+	repo, err := repository.New(session.Database())
+	if err != nil {
+		t.Fatalf("repository.New() error = %v", err)
+	}
+	record, err := repo.FindByID(context.Background(), domain.ID(id))
+	if err != nil {
+		t.Fatalf("FindByID() error = %v", err)
+	}
+	if record.Description != "Investigate startup cost" ||
+		record.Details.Capture.Kind != domain.CaptureKindThought ||
+		len(record.Details.Capture.Tags) != 0 {
+		t.Errorf("stored record = %+v, want normalized quick-capture defaults", record)
+	}
+}
+
+func TestQuickCaptureAcceptsOptionTerminator(t *testing.T) {
+	dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+	var stdout bytes.Buffer
+	err := Run(
+		context.Background(),
+		[]string{"capture", "--quick", "--", "- investigate startup cost"},
+		quickCaptureRuntime(dataDirectory, &stdout),
+		"dev",
+	)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if !strings.HasPrefix(stdout.String(), "Created capture cap_") {
+		t.Errorf("stdout = %q, want capture confirmation", stdout.String())
+	}
+}
+
+func TestQuickCaptureUsageErrorsDoNotInspectEnvironment(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr string
+	}{
+		{name: "missing description", args: []string{"capture", "--quick"}, wantErr: "capture requires a description"},
+		{name: "interactive not implemented", args: []string{"capture", "description"}, wantErr: "capture currently requires --quick"},
+		{name: "unknown flag", args: []string{"capture", "--quick", "--kind", "thought"}, wantErr: `unknown argument "--kind"`},
+		{name: "extra description", args: []string{"capture", "--quick", "one", "two"}, wantErr: `unexpected argument "two"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rt := quickCaptureRuntime(t.TempDir(), &bytes.Buffer{})
+			rt.Env = func(string) string {
+				t.Fatal("usage error inspected environment")
+				return ""
+			}
+			err := Run(context.Background(), tt.args, rt, "dev")
+			var usageErr *UsageError
+			if !errors.As(err, &usageErr) {
+				t.Fatalf("Run() error = %T %v, want *UsageError", err, err)
+			}
+			if err.Error() != tt.wantErr {
+				t.Errorf("Run() error = %q, want %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestQuickCaptureValidationHappensBeforeStorage(t *testing.T) {
+	dataDirectory := filepath.Join(t.TempDir(), "missing")
+	rt := quickCaptureRuntime(dataDirectory, &bytes.Buffer{})
+	rt.Env = func(string) string {
+		t.Fatal("invalid capture inspected environment")
+		return ""
+	}
+	err := Run(context.Background(), []string{"capture", "--quick", " \t "}, rt, "dev")
+	if err == nil || !strings.Contains(err.Error(), "invalid description") {
+		t.Fatalf("Run() error = %v, want invalid-description error", err)
+	}
+	if _, statErr := os.Stat(dataDirectory); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("data directory state error = %v, want not exist", statErr)
+	}
+}
+
+func TestQuickCaptureStorageFailureProducesNoOutput(t *testing.T) {
+	var stdout bytes.Buffer
+	rt := quickCaptureRuntime("relative", &stdout)
+	err := Run(context.Background(), []string{"capture", "--quick", "description"}, rt, "dev")
+	if err == nil || !strings.Contains(err.Error(), "FORGE_DATA_DIR must be an absolute path") {
+		t.Fatalf("Run() error = %v, want path error", err)
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("stdout = %q, want empty", stdout.String())
+	}
+}
+
+func quickCaptureRuntime(dataDirectory string, stdout *bytes.Buffer) Runtime {
+	return Runtime{
+		Stdout: stdout,
+		Env: func(name string) string {
+			if name == "FORGE_DATA_DIR" {
+				return dataDirectory
+			}
+			return ""
+		},
+		Now:    func() time.Time { return time.Date(2026, time.August, 25, 12, 0, 0, 0, time.UTC) },
+		Random: bytes.NewReader(make([]byte, 16)),
+		GOOS:   runtime.GOOS,
+		EUID:   os.Geteuid(),
 	}
 }
 

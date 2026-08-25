@@ -346,8 +346,10 @@ Current implementation status:
   now distinguishes create-or-open from open-existing directory access. Owned
   storage sessions support both schema-checked access to existing databases and
   transactional creation and migration.
-- Phases 5 through 8 remain planned and unimplemented; Phase 5 non-interactive
-  command slices are next.
+- Phase 5 is in progress. The first quick-capture slice accepts `--quick` and one
+  description, applies the `thought` default, and persists through the complete
+  secure-storage lifecycle with human confirmation.
+- Phases 6 through 8 remain planned and unimplemented.
 - The top-level help previews the approved command surface; it does not mean the
   data-backed commands are implemented.
 

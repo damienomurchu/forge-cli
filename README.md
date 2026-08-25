@@ -20,17 +20,19 @@ query is implemented, completing the planned repository surface. Secure storage
 now has distinct create-or-open and open-existing directory primitives. Owned
 storage sessions support both schema-checked access to existing databases and
 transactional creation and migration, completing Phase 4 secure storage. Phase 5
-non-interactive command slices are next.
+has begun with quick capture's first end-to-end slice.
 
 ### Command availability
 
-The current executable implements only the fast, data-free CLI shell:
+The current executable implements the fast, data-free CLI shell and the first
+data-backed command slice:
 
 | Invocation | Status |
 |---|---|
 | `forge`, `forge -h`, `forge --help` | Implemented |
 | `forge --version` | Implemented |
-| `forge capture` | Planned |
+| `forge capture --quick DESCRIPTION` | Implemented |
+| Other `forge capture` options and interactive mode | Planned |
 | `forge friction` | Planned |
 | `forge list` | Planned |
 | `forge show` | Planned |
@@ -38,9 +40,9 @@ The current executable implements only the fast, data-free CLI shell:
 | `forge review` | Planned |
 
 The planned commands appear in top-level help to communicate the intended product
-surface, but invoking them currently returns an invalid-usage error. Secure SQLite
-storage, non-interactive operations, interactive workflows, release packaging, and
-product hardening remain to be implemented in Phases 4 through 8.
+surface. Non-interactive operations beyond basic quick capture, interactive
+workflows, release packaging, and product hardening remain to be implemented in
+Phases 5 through 8.
 
 The architecture, phased plan, and acceptance criteria are in
 [the rewrite blueprint](docs/blueprint.md). Approved behavior is recorded in the

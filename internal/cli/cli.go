@@ -4,9 +4,16 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"time"
+
+	"github.com/damienomurchu/forge-cli/internal/config"
+	"github.com/damienomurchu/forge-cli/internal/domain"
+	"github.com/damienomurchu/forge-cli/internal/output"
+	"github.com/damienomurchu/forge-cli/internal/repository"
+	"github.com/damienomurchu/forge-cli/internal/storage"
 )
 
 const help = `Forge captures ideas and friction in day-to-day work.
@@ -39,20 +46,26 @@ type Runtime struct {
 	Now    func() time.Time
 	Random io.Reader
 	IsTTY  func() bool
+	GOOS   string
+	EUID   int
 }
 
 // UsageError reports an invalid command line.
 type UsageError struct {
 	Argument string
+	Message  string
 }
 
 func (e *UsageError) Error() string {
+	if e.Message != "" {
+		return e.Message
+	}
 	return fmt.Sprintf("unknown argument %q", e.Argument)
 }
 
 // Run executes Forge for args. The caller owns error presentation and process
 // exit so application code never terminates the process directly.
-func Run(_ context.Context, args []string, rt Runtime, version string) error {
+func Run(ctx context.Context, args []string, rt Runtime, version string) error {
 	switch {
 	case len(args) == 0:
 		_, err := io.WriteString(rt.Stdout, help)
@@ -63,9 +76,76 @@ func Run(_ context.Context, args []string, rt Runtime, version string) error {
 	case len(args) == 1 && args[0] == "--version":
 		_, err := fmt.Fprintf(rt.Stdout, "forge %s\n", version)
 		return err
+	case len(args) > 0 && args[0] == "capture":
+		return runCapture(ctx, args[1:], rt)
 	default:
 		return &UsageError{Argument: args[0]}
 	}
+}
+
+func runCapture(ctx context.Context, args []string, rt Runtime) error {
+	description, err := parseQuickCapture(args)
+	if err != nil {
+		return err
+	}
+	record, err := domain.NewCapture(domain.CaptureInput{
+		Description: description,
+		Kind:        domain.CaptureKindThought,
+	}, rt.Now(), rt.Random)
+	if err != nil {
+		return fmt.Errorf("create capture: %w", err)
+	}
+
+	databasePath, err := config.ResolveDatabasePath(rt.GOOS, rt.Env)
+	if err != nil {
+		return fmt.Errorf("resolve database path: %w", err)
+	}
+	session, err := storage.OpenForCreation(ctx, databasePath, rt.EUID)
+	if err != nil {
+		return fmt.Errorf("open storage for capture: %w", err)
+	}
+	repo, err := repository.New(session.Database())
+	if err != nil {
+		return errors.Join(err, session.Close())
+	}
+	if err := repo.CreateCapture(ctx, record); err != nil {
+		return errors.Join(err, session.Close())
+	}
+	if err := session.Close(); err != nil {
+		return fmt.Errorf("close storage after capture: %w", err)
+	}
+	if err := output.WriteCreated(rt.Stdout, record); err != nil {
+		return fmt.Errorf("write capture result: %w", err)
+	}
+	return nil
+}
+
+func parseQuickCapture(args []string) (string, error) {
+	quick := false
+	optionsEnded := false
+	positionals := make([]string, 0, 1)
+	for _, arg := range args {
+		switch {
+		case !optionsEnded && arg == "--":
+			optionsEnded = true
+		case !optionsEnded && arg == "--quick":
+			quick = true
+		case !optionsEnded && len(arg) > 0 && arg[0] == '-':
+			return "", &UsageError{Argument: arg}
+		default:
+			positionals = append(positionals, arg)
+		}
+	}
+	if len(positionals) == 0 {
+		return "", &UsageError{Message: "capture requires a description"}
+	}
+	if len(positionals) > 1 {
+		return "", &UsageError{Message: fmt.Sprintf("unexpected argument %q", positionals[1])}
+	}
+	if !quick {
+		return "", &UsageError{Message: "capture currently requires --quick"}
+	}
+	return positionals[0], nil
 }
 
 // WriteError writes a concise user-facing error and returns its exit status.

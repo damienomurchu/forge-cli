@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/damienomurchu/forge-cli/internal/cli"
@@ -20,6 +21,8 @@ func main() {
 		Now:    time.Now,
 		Random: rand.Reader,
 		IsTTY:  stdinIsTerminal,
+		GOOS:   runtime.GOOS,
+		EUID:   os.Geteuid(),
 	}
 
 	if err := cli.Run(context.Background(), os.Args[1:], rt, version); err != nil {
