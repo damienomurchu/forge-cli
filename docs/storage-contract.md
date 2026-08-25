@@ -165,6 +165,11 @@ and all tags in one transaction. Friction records can never have tag rows.
 - Released migration files are immutable. Schema changes use new migrations.
 - `PRAGMA foreign_keys = ON` is required on every database connection.
 
+The production migration registry currently embeds and applies
+`001_initial.sql`. Schema inspection is separate and read-only: an empty database
+reports version `0` with a migration required, while a database newer than the
+executable is rejected without modification.
+
 The initial driver decision in `docs/decisions/001-sqlite-driver.md` sets a 250 ms
 SQLite busy timeout. Application tests will confirm the resulting error remains
 actionable under real command execution. Journal and synchronous modes retain
