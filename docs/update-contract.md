@@ -51,9 +51,12 @@ filesystem, clock, and stored-data failures also leave the record unchanged.
 
 ## Results
 
-Human mode writes a concise confirmation containing the record ID and resulting
-status to stdout. Exact wording will be approved with an implementation golden
-test.
+Human mode writes this concise confirmation to stdout for both a real change and a
+successful no-op:
+
+```text
+Updated <record-id> to <status>
+```
 
 With `--json`, success emits exactly one complete resulting record object followed
 by a newline. This applies to both a changed status and a successful no-op. Output
