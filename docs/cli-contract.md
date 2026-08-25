@@ -50,6 +50,26 @@ deterministic fallback that is defined when the Go executable is introduced.
 - Usage mistakes, validation failures, and operational errors go to stderr.
 - An error must not duplicate its message across stdout and stderr.
 
+## JSON output
+
+JSON is an explicit machine-readable mode enabled with `--json` on commands that
+support it. Commands use human-readable output by default.
+
+- A successful command that returns one record emits one JSON object.
+- A successful list or review command emits one JSON array, including `[]` when no
+  records match.
+- JSON stdout contains only the requested JSON value: no styling, progress,
+  confirmation, labels, or other human commentary.
+- Errors are concise text on stderr and produce no JSON on stdout. Structured JSON
+  errors are not part of the initial interface.
+- Successful JSON output is terminated by a newline.
+
+Field names and JSON value types become public API when they are included in a
+released version. Minor releases may add optional fields. Removing or renaming a
+field, changing its type, or changing the top-level object/array shape requires a
+major-version decision and release. Exact record fields will be approved alongside
+the domain model before the first command that emits them is released.
+
 ## Exit statuses
 
 Forge uses these initial exit-status categories:
