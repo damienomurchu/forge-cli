@@ -77,7 +77,11 @@ func (p *Adapter) run(ctx context.Context, field huh.Field) error {
 	}
 	runContext, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
-	input := &eofReader{Reader: p.input, onImmediateEOF: func() { cancel(ErrEOF) }}
+	observedInput := &eofReader{Reader: p.input, onImmediateEOF: func() { cancel(ErrEOF) }}
+	var input io.Reader = observedInput
+	if terminal, ok := p.input.(terminalFile); ok {
+		input = &eofTerminalReader{eofReader: observedInput, terminal: terminal}
+	}
 	form := huh.NewForm(huh.NewGroup(field)).
 		WithInput(input).
 		WithOutput(p.output).
@@ -106,6 +110,25 @@ type eofReader struct {
 	sawInput       bool
 	onImmediateEOF func()
 }
+
+// eofTerminalReader preserves terminal identity while observing reads. Bubble
+// Tea uses this interface to enter raw mode and restore terminal state.
+type eofTerminalReader struct {
+	*eofReader
+	terminal terminalFile
+}
+
+type terminalFile interface {
+	io.ReadWriteCloser
+	Fd() uintptr
+}
+
+func (r *eofTerminalReader) Write(buffer []byte) (int, error) {
+	return r.terminal.Write(buffer)
+}
+
+func (r *eofTerminalReader) Close() error { return r.terminal.Close() }
+func (r *eofTerminalReader) Fd() uintptr  { return r.terminal.Fd() }
 
 func (r *eofReader) Read(buffer []byte) (int, error) {
 	count, err := r.Reader.Read(buffer)

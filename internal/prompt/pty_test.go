@@ -85,6 +85,14 @@ func TestCtrlCRestoresTerminalState(t *testing.T) {
 			t.Fatalf("prompt did not render; output: %q", output)
 		}
 	}
+	during, err := term.GetState(int(master.Fd()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reflect.DeepEqual(before, during) {
+		_ = command.Process.Kill()
+		t.Fatal("terminal did not enter raw mode while prompt was active")
+	}
 	if _, err := master.Write([]byte{3}); err != nil {
 		t.Fatal(err)
 	}
