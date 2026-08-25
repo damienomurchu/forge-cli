@@ -124,6 +124,30 @@ func TestQuickFrictionPersistsExplicitFrequency(t *testing.T) {
 	}
 }
 
+func TestQuickFrictionPersistsExplicitImpact(t *testing.T) {
+	for _, args := range [][]string{
+		{"friction", "--quick", "--impact", "high", "spaced impact"},
+		{"friction", "--quick", "--impact=high", "equals impact"},
+	} {
+		t.Run(args[2], func(t *testing.T) {
+			dataDirectory := filepath.Join(t.TempDir(), "forge-data")
+			var stdout bytes.Buffer
+			err := Run(
+				context.Background(),
+				args,
+				quickCaptureRuntime(dataDirectory, &stdout),
+				"dev",
+			)
+			if err != nil {
+				t.Fatalf("Run() error = %v", err)
+			}
+			if got := readQuickFriction(t, dataDirectory).Details.Friction.Impact; got != domain.ImpactHigh {
+				t.Errorf("stored impact = %q, want high", got)
+			}
+		})
+	}
+}
+
 func TestQuickFrictionUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -134,7 +158,9 @@ func TestQuickFrictionUsageErrorsDoNotInspectEnvironment(t *testing.T) {
 		{name: "interactive not implemented", args: []string{"friction", "description"}, wantErr: "friction currently requires --quick"},
 		{name: "missing frequency", args: []string{"friction", "--quick", "--frequency"}, wantErr: `--frequency requires a value`},
 		{name: "empty frequency", args: []string{"friction", "--quick", "--frequency=", "description"}, wantErr: `--frequency requires a value`},
-		{name: "unknown flag", args: []string{"friction", "--quick", "--impact", "high", "description"}, wantErr: `unknown argument "--impact"`},
+		{name: "missing impact", args: []string{"friction", "--quick", "--impact"}, wantErr: `--impact requires a value`},
+		{name: "empty impact", args: []string{"friction", "--quick", "--impact=", "description"}, wantErr: `--impact requires a value`},
+		{name: "unknown flag", args: []string{"friction", "--quick", "--category", "other", "description"}, wantErr: `unknown argument "--category"`},
 		{name: "extra description", args: []string{"friction", "--quick", "one", "two"}, wantErr: `unexpected argument "two"`},
 	}
 	for _, tt := range tests {
@@ -164,6 +190,7 @@ func TestQuickFrictionValidationHappensBeforeStorage(t *testing.T) {
 	}{
 		{name: "description", args: []string{"friction", "--quick", " \t "}, wantErr: "invalid description"},
 		{name: "frequency", args: []string{"friction", "--quick", "--frequency", "often", "description"}, wantErr: `invalid frequency "often"`},
+		{name: "impact", args: []string{"friction", "--quick", "--impact", "severe", "description"}, wantErr: `invalid impact "severe"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

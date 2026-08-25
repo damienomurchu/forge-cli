@@ -54,7 +54,8 @@ Flags:
 const frictionHelp = `Record recurring friction.
 
 Usage:
-  forge friction --quick [--frequency FREQUENCY] DESCRIPTION
+  forge friction --quick [--frequency FREQUENCY]
+                 [--impact IMPACT] DESCRIPTION
 
 Defaults in quick mode:
   frequency  unknown
@@ -64,6 +65,7 @@ Defaults in quick mode:
 Flags:
   -h, --help                 Show help
       --frequency FREQUENCY  Set occurrence frequency (default: unknown)
+      --impact IMPACT        Set severity (default: unknown)
       --quick                Record without prompting (currently required)
 `
 
@@ -129,7 +131,7 @@ func runFriction(ctx context.Context, args []string, rt Runtime) error {
 	record, err := domain.NewFriction(domain.FrictionInput{
 		Description: options.description,
 		Frequency:   options.frequency,
-		Impact:      domain.ImpactUnknown,
+		Impact:      options.impact,
 		Category:    domain.CategoryOther,
 	}, rt.Now(), rt.Random)
 	if err != nil {
@@ -163,6 +165,7 @@ func runFriction(ctx context.Context, args []string, rt Runtime) error {
 type quickFrictionOptions struct {
 	description string
 	frequency   domain.Frequency
+	impact      domain.Impact
 }
 
 func parseQuickFriction(args []string) (quickFrictionOptions, error) {
@@ -170,6 +173,7 @@ func parseQuickFriction(args []string) (quickFrictionOptions, error) {
 	optionsEnded := false
 	positionals := make([]string, 0, 1)
 	frequency := domain.FrequencyUnknown
+	impact := domain.ImpactUnknown
 	for index := 0; index < len(args); index++ {
 		arg := args[index]
 		switch {
@@ -197,6 +201,26 @@ func parseQuickFriction(args []string) (quickFrictionOptions, error) {
 				return quickFrictionOptions{}, err
 			}
 			frequency = parsed
+		case !optionsEnded && arg == "--impact":
+			if index+1 >= len(args) || strings.HasPrefix(args[index+1], "-") {
+				return quickFrictionOptions{}, &UsageError{Message: "--impact requires a value"}
+			}
+			index++
+			parsed, err := domain.ParseImpact(args[index])
+			if err != nil {
+				return quickFrictionOptions{}, err
+			}
+			impact = parsed
+		case !optionsEnded && strings.HasPrefix(arg, "--impact="):
+			value := strings.TrimPrefix(arg, "--impact=")
+			if value == "" {
+				return quickFrictionOptions{}, &UsageError{Message: "--impact requires a value"}
+			}
+			parsed, err := domain.ParseImpact(value)
+			if err != nil {
+				return quickFrictionOptions{}, err
+			}
+			impact = parsed
 		case !optionsEnded && strings.HasPrefix(arg, "-"):
 			return quickFrictionOptions{}, &UsageError{Argument: arg}
 		default:
@@ -215,6 +239,7 @@ func parseQuickFriction(args []string) (quickFrictionOptions, error) {
 	return quickFrictionOptions{
 		description: positionals[0],
 		frequency:   frequency,
+		impact:      impact,
 	}, nil
 }
 
