@@ -94,9 +94,78 @@ func Run(ctx context.Context, args []string, rt Runtime, version string) error {
 		return err
 	case len(args) > 0 && args[0] == "capture":
 		return runCapture(ctx, args[1:], rt)
+	case len(args) > 0 && args[0] == "friction":
+		return runFriction(ctx, args[1:], rt)
 	default:
 		return &UsageError{Argument: args[0]}
 	}
+}
+
+func runFriction(ctx context.Context, args []string, rt Runtime) error {
+	description, err := parseQuickFriction(args)
+	if err != nil {
+		return err
+	}
+	record, err := domain.NewFriction(domain.FrictionInput{
+		Description: description,
+		Frequency:   domain.FrequencyUnknown,
+		Impact:      domain.ImpactUnknown,
+		Category:    domain.CategoryOther,
+	}, rt.Now(), rt.Random)
+	if err != nil {
+		return fmt.Errorf("create friction: %w", err)
+	}
+
+	databasePath, err := config.ResolveDatabasePath(rt.GOOS, rt.Env)
+	if err != nil {
+		return fmt.Errorf("resolve database path: %w", err)
+	}
+	session, err := storage.OpenForCreation(ctx, databasePath, rt.EUID)
+	if err != nil {
+		return fmt.Errorf("open storage for friction: %w", err)
+	}
+	repo, err := repository.New(session.Database())
+	if err != nil {
+		return errors.Join(err, session.Close())
+	}
+	if err := repo.CreateFriction(ctx, record); err != nil {
+		return errors.Join(err, session.Close())
+	}
+	if err := session.Close(); err != nil {
+		return fmt.Errorf("close storage after friction: %w", err)
+	}
+	if err := output.WriteCreated(rt.Stdout, record); err != nil {
+		return fmt.Errorf("write friction result: %w", err)
+	}
+	return nil
+}
+
+func parseQuickFriction(args []string) (string, error) {
+	quick := false
+	optionsEnded := false
+	positionals := make([]string, 0, 1)
+	for _, arg := range args {
+		switch {
+		case !optionsEnded && arg == "--":
+			optionsEnded = true
+		case !optionsEnded && arg == "--quick":
+			quick = true
+		case !optionsEnded && strings.HasPrefix(arg, "-"):
+			return "", &UsageError{Argument: arg}
+		default:
+			positionals = append(positionals, arg)
+		}
+	}
+	if len(positionals) == 0 {
+		return "", &UsageError{Message: "friction requires a description"}
+	}
+	if len(positionals) > 1 {
+		return "", &UsageError{Message: fmt.Sprintf("unexpected argument %q", positionals[1])}
+	}
+	if !quick {
+		return "", &UsageError{Message: "friction currently requires --quick"}
+	}
+	return positionals[0], nil
 }
 
 func runCapture(ctx context.Context, args []string, rt Runtime) error {
