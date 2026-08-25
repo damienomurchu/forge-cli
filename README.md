@@ -9,8 +9,9 @@ CLI's product design, not a clone of the archived Python version.
 The product specification, performance harness, fast Go CLI shell, domain model,
 and initial presentation layer are established. Phase 3 completed the validated
 record model, deterministic JSON, and terminal-safe human output foundations.
-Phase 4 secure storage work has begun with centralized, read-only database path
-resolution; secure filesystem handling is next.
+Phase 4 secure storage work now includes centralized, read-only database path
+resolution and secure preparation of an owned, private data directory. Secure
+database-file opening is next.
 
 ### Command availability
 

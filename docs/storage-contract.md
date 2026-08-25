@@ -210,5 +210,11 @@ Path resolution, ownership, permissions, regular-file checks, symlink rejection,
 and no-follow opening follow `docs/blueprint.md`. Tests use temporary directories
 and databases exclusively and never inspect or mutate real Forge user data.
 
+Data-directory preparation creates only the final path component with mode `0700`;
+its parent must already exist. It rejects symbolic links and non-directories, opens
+the directory without following links, verifies effective-user ownership before
+correcting permissions to `0700`, and returns the verified open handle for later
+descriptor-relative database operations.
+
 Importing the archived Python database is outside this schema. If demand exists,
 provide an explicit importer that validates and converts records into this model.
