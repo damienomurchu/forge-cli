@@ -3,8 +3,36 @@ package domain
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 )
+
+func TestParseCaptureType(t *testing.T) {
+	testVocabulary(t, "capture type", ParseCaptureType, []CaptureType{
+		CaptureTypeFriction,
+		CaptureTypeAction,
+		CaptureTypeFollowUp,
+		CaptureTypeDecision,
+	})
+}
+
+func TestCaptureTypes(t *testing.T) {
+	want := []CaptureType{
+		CaptureTypeFriction,
+		CaptureTypeAction,
+		CaptureTypeFollowUp,
+		CaptureTypeDecision,
+	}
+	got := CaptureTypes()
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("CaptureTypes() = %v, want %v", got, want)
+	}
+
+	got[0] = CaptureTypeDecision
+	if next := CaptureTypes(); !reflect.DeepEqual(next, want) {
+		t.Errorf("CaptureTypes() after caller mutation = %v, want %v", next, want)
+	}
+}
 
 func TestParseRecordType(t *testing.T) {
 	testVocabulary(t, "record type", ParseRecordType, []RecordType{

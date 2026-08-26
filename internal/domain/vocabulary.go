@@ -14,6 +14,43 @@ func (e *InvalidValueError) Error() string {
 	return fmt.Sprintf("invalid %s %q", e.Field, e.Value)
 }
 
+// CaptureType identifies the workflow-specific type of a capture.
+type CaptureType string
+
+const (
+	CaptureTypeFriction CaptureType = "friction"
+	CaptureTypeAction   CaptureType = "action"
+	CaptureTypeFollowUp CaptureType = "follow-up"
+	CaptureTypeDecision CaptureType = "decision"
+)
+
+func (v CaptureType) String() string { return string(v) }
+
+// Valid reports whether v is an approved capture type.
+func (v CaptureType) Valid() bool {
+	switch v {
+	case CaptureTypeFriction, CaptureTypeAction, CaptureTypeFollowUp, CaptureTypeDecision:
+		return true
+	default:
+		return false
+	}
+}
+
+// ParseCaptureType parses an exact, normalized capture type.
+func ParseCaptureType(value string) (CaptureType, error) {
+	return parseValue("capture type", value, CaptureType(value))
+}
+
+// CaptureTypes returns the approved capture types in interactive display order.
+func CaptureTypes() []CaptureType {
+	return []CaptureType{
+		CaptureTypeFriction,
+		CaptureTypeAction,
+		CaptureTypeFollowUp,
+		CaptureTypeDecision,
+	}
+}
+
 // RecordType identifies the kind of a Forge record.
 type RecordType string
 
