@@ -60,7 +60,10 @@ applies friction defaults, rejects duplicate or type-inappropriate flags, and
 returns normalized description-only intent for interactive collection. The
 collector prompts for the type and only its relevant fields, constructs the same
 validated proposal, writes the shared summary, and requires confirmation. Neither
-boundary generates persistence metadata or accesses storage. Keep both
+boundary generates persistence metadata or accesses storage. The undispatched
+`persistUnifiedCapture` boundary adds metadata to a confirmed proposal, stores it
+through the unified repository, and writes the shared human or JSON result. It
+does not own storage session setup or activate schema 2. Keep these boundaries
 undispatched until the coordinated schema-2 command cutover is ready.
 
 ## Friction details
