@@ -125,7 +125,10 @@ The legacy schema-1 method already owns the final `CreateCapture` name. Rename t
 unified method only when legacy callers are removed during cutover. Unified lookup
 is similarly available as `FindUnifiedCaptureByID(ctx, id)` with complete typed
 decoding, stored-data validation, stable not-found classification, and migrated
-friction-ID support; it can take the final `FindByID` name at cutover.
+friction-ID support; it can take the final `FindByID` name at cutover. Unified
+listing is available as `ListUnifiedCaptures(ctx, filters)` with AND-composed type,
+friction-project, and positive-limit filters, deterministic newest-first ordering,
+complete typed decoding, and verified use of the schema-2 filter indexes.
 
 Creation inserts common and matching typed values atomically. Reads validate the
 complete stored shape; malformed rows fail rather than being partially decoded.
