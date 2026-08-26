@@ -26,6 +26,14 @@ Type-aware review workflows are planned but not yet specified or implemented.
 
 Run `forge --help` or `forge <command> --help` for complete command usage.
 
+## Installation and platforms
+
+Forge supports Linux AMD64 and macOS ARM64. Windows and other platforms are not
+currently supported release targets.
+
+See the [installation guide](docs/installation.md) for release downloads, source
+builds, shell completion setup, and data locations.
+
 ## Shell completion
 
 Generate a completion script for Bash, Fish, or Zsh:
@@ -70,6 +78,7 @@ or newer, or `just benchmark /path/to/forge` for an existing executable.
 
 - [Architecture](docs/architecture.md) describes package boundaries and durable
   engineering constraints.
+- [Installation](docs/installation.md) covers supported platforms and setup.
 - [CLI contract](docs/cli-contract.md) defines the command shell, list, and show.
 - [Capture contract](docs/capture-contract.md) defines interactive and quick
   capture behavior.
@@ -80,3 +89,7 @@ or newer, or `just benchmark /path/to/forge` for an existing executable.
   latency budgets.
 
 Accepted dependency decisions are recorded under `docs/decisions/`.
+
+## License
+
+Forge is licensed under the [Apache License 2.0](LICENSE).
