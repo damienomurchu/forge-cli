@@ -36,6 +36,6 @@ Implementation status: the live list command uses `parseUnifiedListRequest` and
 repository filters, recognizes only the four capture types, normalizes project
 values, validates positive limits, and rejects the removed universal status
 filter. The executor passes those filters to the
-unified repository and renders the shared human or JSON result without owning
+capture repository and renders the shared human or JSON result without owning
 storage discovery or session setup. The live handler retains that ownership and
 keeps missing-storage reads non-creating.

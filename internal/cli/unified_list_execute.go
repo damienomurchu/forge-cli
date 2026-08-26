@@ -14,7 +14,7 @@ import (
 // unifiedCaptureLister is the repository boundary required to execute a
 // unified list request. repository.Repository satisfies it directly.
 type unifiedCaptureLister interface {
-	ListUnifiedCaptures(context.Context, repository.UnifiedCaptureFilters) ([]domain.Capture, error)
+	List(context.Context, repository.CaptureFilters) ([]domain.Capture, error)
 }
 
 // executeUnifiedList queries and renders a parsed unified list request.
@@ -32,7 +32,7 @@ func executeUnifiedList(
 	if stdout == nil {
 		return fmt.Errorf("write list result: writer is required")
 	}
-	captures, err := lister.ListUnifiedCaptures(ctx, request.filters)
+	captures, err := lister.List(ctx, request.filters)
 	if err != nil {
 		return fmt.Errorf("list unified captures: %w", err)
 	}

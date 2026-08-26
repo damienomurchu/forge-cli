@@ -161,3 +161,9 @@ func sequentialIDBytes() []byte {
 		0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
 	}
 }
+
+type panicReader struct{}
+
+func (panicReader) Read([]byte) (int, error) {
+	panic("random source must not be read")
+}

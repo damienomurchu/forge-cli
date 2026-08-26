@@ -117,13 +117,11 @@ FindByID(ctx, id)
 List(ctx, filters)
 ```
 
-Implementation status: the live CLI uses the transitional
-`CreateUnifiedCapture`, `FindUnifiedCaptureByID`, and `ListUnifiedCaptures` method
-names against schema 2. They provide complete typed decoding, stored-data
-validation, stable not-found classification, migrated friction-ID support,
-AND-composed filters, deterministic ordering, and verified index use. Rename them
-to the final repository surface when the now-unreachable schema-1 methods are
-removed during cleanup.
+Implementation status: the legacy schema-1 repository surface has been removed.
+The live CLI uses the final `CreateCapture`, `FindByID`, and `List` methods against
+schema 2. They provide complete typed decoding, stored-data validation, stable
+not-found classification, migrated friction-ID support, AND-composed filters,
+deterministic ordering, and verified index use.
 
 Creation inserts common and matching typed values atomically. Reads validate the
 complete stored shape; malformed rows fail rather than being partially decoded.

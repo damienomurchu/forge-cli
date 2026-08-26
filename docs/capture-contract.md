@@ -63,7 +63,7 @@ collector prompts for the type and only its relevant fields, constructs the same
 validated proposal, writes the shared summary, and requires confirmation. Neither
 boundary generates persistence metadata or accesses storage. The
 `persistUnifiedCapture` boundary adds metadata to a confirmed proposal, stores it
-through the unified repository, and writes the shared human or JSON result. It
+through the capture repository, and writes the shared human or JSON result. It
 does not own storage session setup; the live handler opens storage only after
 quick validation or interactive confirmation and withholds result output until
 the session closes successfully.

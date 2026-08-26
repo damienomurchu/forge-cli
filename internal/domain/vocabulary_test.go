@@ -34,34 +34,6 @@ func TestCaptureTypes(t *testing.T) {
 	}
 }
 
-func TestParseRecordType(t *testing.T) {
-	testVocabulary(t, "record type", ParseRecordType, []RecordType{
-		RecordTypeCapture,
-		RecordTypeFriction,
-	})
-}
-
-func TestParseStatus(t *testing.T) {
-	testVocabulary(t, "status", ParseStatus, []Status{
-		StatusCaptured,
-		StatusReviewing,
-		StatusCandidate,
-		StatusAutomated,
-		StatusDismissed,
-	})
-}
-
-func TestParseCaptureKind(t *testing.T) {
-	testVocabulary(t, "capture kind", ParseCaptureKind, []CaptureKind{
-		CaptureKindThought,
-		CaptureKindIdea,
-		CaptureKindObservation,
-		CaptureKindQuestion,
-		CaptureKindDecision,
-		CaptureKindSeed,
-	})
-}
-
 func TestParseFrequency(t *testing.T) {
 	testVocabulary(t, "frequency", ParseFrequency, []Frequency{
 		FrequencyDaily,

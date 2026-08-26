@@ -27,6 +27,6 @@ timestamps, or alter type-specific details.
 
 Implementation status: the existing `parseShow` boundary already satisfies the
 reset syntax and opaque-ID validation rules. The live handler uses
-`executeUnifiedShow` with the unified repository and shared human or JSON
+`executeUnifiedShow` with the capture repository and shared human or JSON
 renderers while retaining storage discovery, session setup, and user-facing
 not-found presentation.

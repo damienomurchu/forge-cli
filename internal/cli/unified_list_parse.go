@@ -9,7 +9,7 @@ import (
 )
 
 type unifiedListRequest struct {
-	filters repository.UnifiedCaptureFilters
+	filters repository.CaptureFilters
 	json    bool
 }
 

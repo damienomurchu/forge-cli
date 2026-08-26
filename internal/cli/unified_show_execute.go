@@ -13,7 +13,7 @@ import (
 // unifiedCaptureFinder is the repository boundary required to execute a
 // unified show request. repository.Repository satisfies it directly.
 type unifiedCaptureFinder interface {
-	FindUnifiedCaptureByID(context.Context, domain.ID) (domain.Capture, error)
+	FindByID(context.Context, domain.ID) (domain.Capture, error)
 }
 
 // executeUnifiedShow finds and renders one unified capture. Command dispatch
@@ -32,7 +32,7 @@ func executeUnifiedShow(
 	if stdout == nil {
 		return fmt.Errorf("write show result: writer is required")
 	}
-	capture, err := finder.FindUnifiedCaptureByID(ctx, id)
+	capture, err := finder.FindByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("find unified capture: %w", err)
 	}

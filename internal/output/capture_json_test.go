@@ -24,12 +24,12 @@ func TestWriteCaptureJSONMatchesGolden(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			want, err := os.ReadFile(filepath.Join("testdata", "unified-"+tt.name+".golden"))
+			want, err := os.ReadFile(filepath.Join("testdata", ""+tt.name+".golden"))
 			if err != nil {
 				t.Fatal(err)
 			}
 			var got bytes.Buffer
-			if err := WriteCaptureJSON(&got, unifiedCapture(t, tt.captureType)); err != nil {
+			if err := WriteCaptureJSON(&got, testCapture(t, tt.captureType)); err != nil {
 				t.Fatalf("WriteCaptureJSON() error = %v", err)
 			}
 			if got.String() != string(want) {
@@ -72,7 +72,7 @@ func TestWriteCaptureJSONEmitsNullOptionalFrictionText(t *testing.T) {
 }
 
 func TestWriteCaptureJSONAcceptsMigratedFrictionID(t *testing.T) {
-	capture := unifiedCapture(t, domain.CaptureTypeFriction)
+	capture := testCapture(t, domain.CaptureTypeFriction)
 	capture.ID = "frc_00000000000000000000000000000000"
 	var got bytes.Buffer
 	if err := WriteCaptureJSON(&got, capture); err != nil {
@@ -85,14 +85,14 @@ func TestWriteCaptureJSONAcceptsMigratedFrictionID(t *testing.T) {
 
 func TestWriteCapturesJSONPreservesOrder(t *testing.T) {
 	captures := []domain.Capture{
-		unifiedCapture(t, domain.CaptureTypeAction),
-		unifiedCapture(t, domain.CaptureTypeFriction),
+		testCapture(t, domain.CaptureTypeAction),
+		testCapture(t, domain.CaptureTypeFriction),
 	}
 	var got bytes.Buffer
 	if err := WriteCapturesJSON(&got, captures); err != nil {
 		t.Fatalf("WriteCapturesJSON() error = %v", err)
 	}
-	want, err := os.ReadFile(filepath.Join("testdata", "unified-captures.golden"))
+	want, err := os.ReadFile(filepath.Join("testdata", "captures.golden"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,8 +113,8 @@ func TestWriteCapturesJSONEmitsEmptyArray(t *testing.T) {
 	}
 }
 
-func TestUnifiedCaptureJSONValidatesBeforeWriting(t *testing.T) {
-	invalid := unifiedCapture(t, domain.CaptureTypeDecision)
+func TestCaptureJSONValidatesBeforeWriting(t *testing.T) {
+	invalid := testCapture(t, domain.CaptureTypeDecision)
 	invalid.Description = " invalid "
 
 	var single bytes.Buffer
@@ -125,23 +125,23 @@ func TestUnifiedCaptureJSONValidatesBeforeWriting(t *testing.T) {
 	}
 
 	var list bytes.Buffer
-	err = WriteCapturesJSON(&list, []domain.Capture{unifiedCapture(t, domain.CaptureTypeAction), invalid})
+	err = WriteCapturesJSON(&list, []domain.Capture{testCapture(t, domain.CaptureTypeAction), invalid})
 	if !errors.As(err, &invalidValue) || list.Len() != 0 {
 		t.Fatalf("WriteCapturesJSON() error/output = %v/%q, want validation and no output", err, list.String())
 	}
 }
 
-func TestUnifiedCaptureJSONPropagatesWriterFailures(t *testing.T) {
+func TestCaptureJSONPropagatesWriterFailures(t *testing.T) {
 	wantErr := errors.New("writer failed")
-	if err := WriteCaptureJSON(errorWriter{err: wantErr}, unifiedCapture(t, domain.CaptureTypeAction)); !errors.Is(err, wantErr) {
+	if err := WriteCaptureJSON(errorWriter{err: wantErr}, testCapture(t, domain.CaptureTypeAction)); !errors.Is(err, wantErr) {
 		t.Fatalf("WriteCaptureJSON() error = %v, want %v", err, wantErr)
 	}
-	if err := WriteCapturesJSON(errorWriter{err: wantErr}, []domain.Capture{unifiedCapture(t, domain.CaptureTypeAction)}); !errors.Is(err, wantErr) {
+	if err := WriteCapturesJSON(errorWriter{err: wantErr}, []domain.Capture{testCapture(t, domain.CaptureTypeAction)}); !errors.Is(err, wantErr) {
 		t.Fatalf("WriteCapturesJSON() error = %v, want %v", err, wantErr)
 	}
 }
 
-func unifiedCapture(t *testing.T, captureType domain.CaptureType) domain.Capture {
+func testCapture(t *testing.T, captureType domain.CaptureType) domain.Capture {
 	t.Helper()
 	description := map[domain.CaptureType]string{
 		domain.CaptureTypeFriction: "Releases require manual checks",

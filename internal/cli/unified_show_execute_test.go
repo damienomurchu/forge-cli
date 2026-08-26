@@ -141,7 +141,7 @@ type recordingUnifiedCaptureFinder struct {
 	err     error
 }
 
-func (f *recordingUnifiedCaptureFinder) FindUnifiedCaptureByID(
+func (f *recordingUnifiedCaptureFinder) FindByID(
 	_ context.Context, id domain.ID,
 ) (domain.Capture, error) {
 	f.ids = append(f.ids, id)

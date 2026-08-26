@@ -12,18 +12,33 @@ import (
 	"github.com/damienomurchu/forge-cli/internal/domain"
 )
 
-func TestFindByIDHydratesCapture(t *testing.T) {
+func TestFindByIDRoundTripsEveryType(t *testing.T) {
+	for index, captureType := range domain.CaptureTypes() {
+		t.Run(captureType.String(), func(t *testing.T) {
+			repository, _ := openTestRepository(t)
+			want := newTestCapture(t, captureType, byte(index+20))
+			if err := repository.CreateCapture(context.Background(), want); err != nil {
+				t.Fatalf("CreateCapture() error = %v", err)
+			}
+			got, err := repository.FindByID(context.Background(), want.ID)
+			if err != nil {
+				t.Fatalf("FindByID() error = %v", err)
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("FindByID() = %#v, want %#v", got, want)
+			}
+		})
+	}
+}
+
+func TestFindByIDPreservesAbsentFrictionText(t *testing.T) {
 	repository, _ := openTestRepository(t)
-	want := newTestCapture(t, domain.CaptureInput{
-		Description: "Hydrate this capture",
-		Project:     "forge",
-		Kind:        domain.CaptureKindDecision,
-		Tags:        "third,first,second",
-	}, 20)
+	want := newTestCapture(t, domain.CaptureTypeFriction, 24)
+	want.Details.Friction.Project = nil
+	want.Details.Friction.CurrentWorkaround = nil
 	if err := repository.CreateCapture(context.Background(), want); err != nil {
 		t.Fatalf("CreateCapture() error = %v", err)
 	}
-
 	got, err := repository.FindByID(context.Background(), want.ID)
 	if err != nil {
 		t.Fatalf("FindByID() error = %v", err)
@@ -33,118 +48,84 @@ func TestFindByIDHydratesCapture(t *testing.T) {
 	}
 }
 
-func TestFindByIDHydratesFriction(t *testing.T) {
+func TestFindByIDSupportsMigratedFrictionID(t *testing.T) {
 	repository, _ := openTestRepository(t)
-	want := newTestFriction(t, domain.FrictionInput{
-		Description:       "Hydrate this friction",
-		Project:           "forge",
-		Frequency:         domain.FrequencyWeekly,
-		Impact:            domain.ImpactHigh,
-		Category:          domain.CategoryContextSwitching,
-		CurrentWorkaround: "Keep two windows open",
-	}, 21)
-	if err := repository.CreateFriction(context.Background(), want); err != nil {
-		t.Fatalf("CreateFriction() error = %v", err)
-	}
-
-	got, err := repository.FindByID(context.Background(), want.ID)
-	if err != nil {
-		t.Fatalf("FindByID() error = %v", err)
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("FindByID() = %#v, want %#v", got, want)
-	}
-}
-
-func TestFindByIDPreservesAbsentOptionalValues(t *testing.T) {
-	repository, _ := openTestRepository(t)
-	capture := newTestCapture(t, domain.CaptureInput{
-		Description: "No capture optionals",
-		Kind:        domain.CaptureKindThought,
-	}, 22)
-	friction := newTestFriction(t, domain.FrictionInput{
-		Description: "No friction optionals",
-		Frequency:   domain.FrequencyUnknown,
-		Impact:      domain.ImpactUnknown,
-		Category:    domain.CategoryOther,
-	}, 23)
-	if err := repository.CreateCapture(context.Background(), capture); err != nil {
+	want := newTestCapture(t, domain.CaptureTypeFriction, 25)
+	want.ID = "frc_19191919191919191919191919191919"
+	if err := repository.CreateCapture(context.Background(), want); err != nil {
 		t.Fatalf("CreateCapture() error = %v", err)
 	}
-	if err := repository.CreateFriction(context.Background(), friction); err != nil {
-		t.Fatalf("CreateFriction() error = %v", err)
-	}
-
-	gotCapture, err := repository.FindByID(context.Background(), capture.ID)
+	got, err := repository.FindByID(context.Background(), want.ID)
 	if err != nil {
-		t.Fatalf("FindByID(capture) error = %v", err)
+		t.Fatalf("FindByID() error = %v", err)
 	}
-	gotFriction, err := repository.FindByID(context.Background(), friction.ID)
-	if err != nil {
-		t.Fatalf("FindByID(friction) error = %v", err)
-	}
-	if !reflect.DeepEqual(gotCapture, capture) || !reflect.DeepEqual(gotFriction, friction) {
-		t.Errorf("absent optional values did not round trip")
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("FindByID() = %#v, want %#v", got, want)
 	}
 }
 
 func TestFindByIDReturnsStableNotFoundError(t *testing.T) {
 	repository, _ := openTestRepository(t)
-	got, err := repository.FindByID(context.Background(), domain.ID("missing"))
-	if got != (domain.Record{}) {
-		t.Errorf("FindByID() = %#v, want zero record", got)
+	got, err := repository.FindByID(context.Background(), "missing")
+	if got != (domain.Capture{}) {
+		t.Errorf("FindByID() = %#v, want zero capture", got)
 	}
 	if !errors.Is(err, ErrRecordNotFound) {
 		t.Fatalf("FindByID() error = %v, want ErrRecordNotFound", err)
 	}
 }
 
-func TestFindByIDRejectsMalformedStoredTimestamp(t *testing.T) {
-	repository, db := openTestRepository(t)
-	record := newTestFriction(t, domain.FrictionInput{
-		Description: "Corrupt timestamp",
-		Frequency:   domain.FrequencyDaily,
-		Impact:      domain.ImpactLow,
-		Category:    domain.CategoryWaiting,
-	}, 24)
-	if err := repository.CreateFriction(context.Background(), record); err != nil {
-		t.Fatalf("CreateFriction() error = %v", err)
-	}
-	if _, err := db.Exec(`UPDATE records SET created_at = 'not-a-timestamp' WHERE id = ?`, record.ID.String()); err != nil {
-		t.Fatalf("corrupt timestamp error = %v", err)
+func TestFindByIDRejectsMalformedStoredData(t *testing.T) {
+	tests := []struct {
+		name   string
+		update string
+	}{
+		{name: "capture type", update: `UPDATE records SET capture_type = 'thought'`},
+		{name: "frequency", update: `UPDATE records SET friction_frequency = 'often'`},
+		{name: "missing friction column", update: `UPDATE records SET friction_impact = NULL`},
+		{name: "mismatched columns", update: `UPDATE records SET capture_type = 'action'`},
+		{name: "created timestamp", update: `UPDATE records SET created_at = 'invalid'`},
+		{name: "updated timestamp", update: `UPDATE records SET updated_at = 'invalid'`},
+		{name: "unnormalized project", update: `UPDATE records SET friction_project = ' forge '`},
 	}
 
-	got, err := repository.FindByID(context.Background(), record.ID)
-	if got != (domain.Record{}) {
-		t.Errorf("FindByID() = %#v, want zero record", got)
-	}
-	if err == nil || !strings.Contains(err.Error(), "decode stored record") || errors.Is(err, ErrRecordNotFound) {
-		t.Fatalf("FindByID() error = %v, want stored-data error", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repository, db := openTestRepository(t)
+			capture := newTestCapture(t, domain.CaptureTypeFriction, 26)
+			if err := repository.CreateCapture(context.Background(), capture); err != nil {
+				t.Fatalf("CreateCapture() error = %v", err)
+			}
+			if _, err := db.Exec(`PRAGMA ignore_check_constraints = ON`); err != nil {
+				t.Fatalf("disable check constraints error = %v", err)
+			}
+			if _, err := db.Exec(tt.update+` WHERE id = ?`, capture.ID.String()); err != nil {
+				t.Fatalf("corrupt stored capture error = %v", err)
+			}
+			if _, err := db.Exec(`PRAGMA ignore_check_constraints = OFF`); err != nil {
+				t.Fatalf("enable check constraints error = %v", err)
+			}
+
+			got, err := repository.FindByID(context.Background(), capture.ID)
+			if got != (domain.Capture{}) {
+				t.Errorf("FindByID() = %#v, want zero capture", got)
+			}
+			if err == nil || !strings.Contains(err.Error(), "decode stored capture") || errors.Is(err, ErrRecordNotFound) {
+				t.Fatalf("FindByID() error = %v, want stored-data error", err)
+			}
+		})
 	}
 }
 
-func TestFindByIDRejectsNoncontiguousCaptureTags(t *testing.T) {
-	repository, db := openTestRepository(t)
-	record := newTestCapture(t, domain.CaptureInput{
-		Description: "Corrupt tag positions",
-		Kind:        domain.CaptureKindObservation,
-		Tags:        "first,second",
-	}, 25)
-	if err := repository.CreateCapture(context.Background(), record); err != nil {
-		t.Fatalf("CreateCapture() error = %v", err)
+func TestFindByIDHonorsCancelledContext(t *testing.T) {
+	repository, _ := openTestRepository(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	got, err := repository.FindByID(ctx, "missing")
+	if got != (domain.Capture{}) {
+		t.Errorf("FindByID() = %#v, want zero capture", got)
 	}
-	if _, err := db.Exec(
-		`UPDATE record_tags SET position = position + 2 WHERE record_id = ?`,
-		record.ID.String(),
-	); err != nil {
-		t.Fatalf("corrupt tag positions error = %v", err)
-	}
-
-	got, err := repository.FindByID(context.Background(), record.ID)
-	if got != (domain.Record{}) {
-		t.Errorf("FindByID() = %#v, want zero record", got)
-	}
-	if err == nil || !strings.Contains(err.Error(), "tag position 2 is not contiguous") {
-		t.Fatalf("FindByID() error = %v, want tag-position error", err)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("FindByID() error = %v, want context.Canceled", err)
 	}
 }

@@ -7,60 +7,46 @@ import (
 	"github.com/damienomurchu/forge-cli/internal/domain"
 )
 
-// CreateCapture stores a validated capture and its ordered tags atomically.
-func (r *Repository) CreateCapture(ctx context.Context, record domain.Record) error {
-	if err := record.Validate(); err != nil {
+// CreateCapture stores a validated capture atomically.
+func (r *Repository) CreateCapture(ctx context.Context, capture domain.Capture) error {
+	if err := capture.Validate(); err != nil {
 		return fmt.Errorf("validate capture: %w", err)
 	}
-	if record.Type != domain.RecordTypeCapture {
-		return fmt.Errorf("validate capture: record type is %q", record.Type)
+
+	var project, frequency, impact, category, workaround any
+	if capture.Type == domain.CaptureTypeFriction {
+		details := capture.Details.Friction
+		project = optionalString(details.Project)
+		frequency = details.Frequency.String()
+		impact = details.Impact.String()
+		category = details.Category.String()
+		workaround = optionalString(details.CurrentWorkaround)
 	}
 
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin capture creation: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	details := record.Details.Capture
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO records (
-			id, type, description, project, status,
-			capture_kind, friction_frequency, friction_impact,
-			friction_category, current_workaround, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?)`,
-		record.ID.String(),
-		record.Type.String(),
-		record.Description,
-		optionalString(record.Project),
-		record.Status.String(),
-		details.Kind.String(),
-		record.CreatedAt.String(),
-		record.UpdatedAt.String(),
+	if _, err := r.db.ExecContext(ctx, `INSERT INTO records (
+		id,
+		capture_type,
+		description,
+		friction_project,
+		friction_frequency,
+		friction_impact,
+		friction_category,
+		friction_current_workaround,
+		created_at,
+		updated_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		capture.ID.String(),
+		capture.Type.String(),
+		capture.Description,
+		project,
+		frequency,
+		impact,
+		category,
+		workaround,
+		capture.CreatedAt.String(),
+		capture.UpdatedAt.String(),
 	); err != nil {
-		return fmt.Errorf("insert capture %s: %w", record.ID, err)
-	}
-
-	for position, tag := range details.Tags {
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO record_tags(record_id, position, tag) VALUES (?, ?, ?)`,
-			record.ID.String(),
-			position,
-			tag,
-		); err != nil {
-			return fmt.Errorf("insert capture %s tag %d: %w", record.ID, position, err)
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit capture %s: %w", record.ID, err)
+		return fmt.Errorf("insert capture %s: %w", capture.ID, err)
 	}
 	return nil
-}
-
-func optionalString(value *string) any {
-	if value == nil {
-		return nil
-	}
-	return *value
 }

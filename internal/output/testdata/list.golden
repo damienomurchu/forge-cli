@@ -1,2 +1,4 @@
-frc_f2308c1797cf4e77ac076e6af5ff1616  friction  reviewing  Releases require repeated manual checks
-cap_7c6b1d85d8ec46e4a4f975e182bf8109  capture  captured  Measure command startup time
+cap_00000000000000000000000000000000  decision  Choose the database
+frc_00000000000000000000000000000000  friction  Releases require manual checks
+cap_00000000000000000000000000000000  action  Ship the release
+cap_00000000000000000000000000000000  follow-up  Chase the vendor

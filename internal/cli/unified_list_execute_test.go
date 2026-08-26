@@ -16,7 +16,7 @@ import (
 
 func TestExecuteUnifiedListForwardsFiltersAndPreservesOrder(t *testing.T) {
 	frictionType, project, limit := domain.CaptureTypeFriction, "forge", 2
-	request := unifiedListRequest{filters: repository.UnifiedCaptureFilters{
+	request := unifiedListRequest{filters: repository.CaptureFilters{
 		Type: &frictionType, Project: &project, Limit: &limit,
 	}}
 	newer := persistedCaptureForUnifiedList(t, domain.CaptureTypeFriction, 2, 15)
@@ -26,7 +26,7 @@ func TestExecuteUnifiedListForwardsFiltersAndPreservesOrder(t *testing.T) {
 	if err := executeUnifiedList(context.Background(), request, lister, &stdout); err != nil {
 		t.Fatalf("executeUnifiedList() error = %v", err)
 	}
-	if !reflect.DeepEqual(lister.filters, []repository.UnifiedCaptureFilters{request.filters}) {
+	if !reflect.DeepEqual(lister.filters, []repository.CaptureFilters{request.filters}) {
 		t.Errorf("filters = %#v, want %#v", lister.filters, request.filters)
 	}
 	want := newer.ID.String() + "  friction  description\n" +
@@ -146,13 +146,13 @@ func TestExecuteUnifiedListRejectsMissingBoundaries(t *testing.T) {
 }
 
 type recordingUnifiedCaptureLister struct {
-	filters  []repository.UnifiedCaptureFilters
+	filters  []repository.CaptureFilters
 	captures []domain.Capture
 	err      error
 }
 
-func (l *recordingUnifiedCaptureLister) ListUnifiedCaptures(
-	_ context.Context, filters repository.UnifiedCaptureFilters,
+func (l *recordingUnifiedCaptureLister) List(
+	_ context.Context, filters repository.CaptureFilters,
 ) ([]domain.Capture, error) {
 	l.filters = append(l.filters, filters)
 	return l.captures, l.err
@@ -160,8 +160,8 @@ func (l *recordingUnifiedCaptureLister) ListUnifiedCaptures(
 
 type contextUnifiedCaptureLister struct{}
 
-func (contextUnifiedCaptureLister) ListUnifiedCaptures(
-	ctx context.Context, _ repository.UnifiedCaptureFilters,
+func (contextUnifiedCaptureLister) List(
+	ctx context.Context, _ repository.CaptureFilters,
 ) ([]domain.Capture, error) {
 	return nil, ctx.Err()
 }

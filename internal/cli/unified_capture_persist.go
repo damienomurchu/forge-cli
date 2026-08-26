@@ -14,7 +14,7 @@ import (
 // unifiedCaptureCreator is the repository boundary required to persist a
 // unified capture. repository.Repository satisfies it directly.
 type unifiedCaptureCreator interface {
-	CreateUnifiedCapture(context.Context, domain.Capture) error
+	CreateCapture(context.Context, domain.Capture) error
 }
 
 // persistUnifiedCapture adds persistence metadata to a confirmed proposal,
@@ -39,7 +39,7 @@ func persistUnifiedCapture(
 	if stdout == nil {
 		return domain.Capture{}, fmt.Errorf("write capture result: writer is required")
 	}
-	if err := creator.CreateUnifiedCapture(ctx, capture); err != nil {
+	if err := creator.CreateCapture(ctx, capture); err != nil {
 		return domain.Capture{}, fmt.Errorf("persist unified capture: %w", err)
 	}
 

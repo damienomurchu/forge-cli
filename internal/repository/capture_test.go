@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,181 +15,141 @@ import (
 
 	"github.com/damienomurchu/forge-cli/internal/domain"
 	"github.com/damienomurchu/forge-cli/internal/storage"
-	forgemigrations "github.com/damienomurchu/forge-cli/migrations"
 )
 
-func TestCreateCaptureStoresRecordAndOrderedTags(t *testing.T) {
-	repository, db := openTestRepository(t)
-	record := newTestCapture(t, domain.CaptureInput{
-		Description: "Measure command startup time",
-		Project:     "forge",
-		Kind:        domain.CaptureKindObservation,
-		Tags:        "performance,cli",
-	}, 0)
-
-	if err := repository.CreateCapture(context.Background(), record); err != nil {
-		t.Fatalf("CreateCapture() error = %v", err)
+func TestCreateCaptureStoresEveryType(t *testing.T) {
+	tests := []struct {
+		captureType    domain.CaptureType
+		wantProject    sql.NullString
+		wantFrequency  sql.NullString
+		wantImpact     sql.NullString
+		wantCategory   sql.NullString
+		wantWorkaround sql.NullString
+	}{
+		{
+			captureType:    domain.CaptureTypeFriction,
+			wantProject:    sql.NullString{String: "forge", Valid: true},
+			wantFrequency:  sql.NullString{String: "weekly", Valid: true},
+			wantImpact:     sql.NullString{String: "high", Valid: true},
+			wantCategory:   sql.NullString{String: "verification", Valid: true},
+			wantWorkaround: sql.NullString{String: "Use a checklist", Valid: true},
+		},
+		{captureType: domain.CaptureTypeAction},
+		{captureType: domain.CaptureTypeFollowUp},
+		{captureType: domain.CaptureTypeDecision},
 	}
 
-	var (
-		id, recordType, description, project, status, kind string
-		frequency, impact, category, workaround            sql.NullString
-		createdAt, updatedAt                               string
-	)
-	if err := db.QueryRow(`SELECT
-		id, type, description, project, status, capture_kind,
-		friction_frequency, friction_impact, friction_category,
-		current_workaround, created_at, updated_at
-		FROM records WHERE id = ?`, record.ID.String()).Scan(
-		&id, &recordType, &description, &project, &status, &kind,
-		&frequency, &impact, &category, &workaround, &createdAt, &updatedAt,
-	); err != nil {
-		t.Fatalf("read stored capture error = %v", err)
-	}
-	if id != record.ID.String() || recordType != "capture" || description != record.Description {
-		t.Errorf("stored identity = %q/%q/%q", id, recordType, description)
-	}
-	if project != "forge" || status != "captured" || kind != "observation" {
-		t.Errorf("stored capture values = %q/%q/%q", project, status, kind)
-	}
-	if frequency.Valid || impact.Valid || category.Valid || workaround.Valid {
-		t.Errorf("stored friction values = %#v/%#v/%#v/%#v, want NULL", frequency, impact, category, workaround)
-	}
-	if createdAt != record.CreatedAt.String() || updatedAt != record.UpdatedAt.String() {
-		t.Errorf("stored timestamps = %q/%q", createdAt, updatedAt)
-	}
+	for index, tt := range tests {
+		t.Run(tt.captureType.String(), func(t *testing.T) {
+			repository, db := openTestRepository(t)
+			capture := newTestCapture(t, tt.captureType, byte(index))
+			if err := repository.CreateCapture(context.Background(), capture); err != nil {
+				t.Fatalf("CreateCapture() error = %v", err)
+			}
 
-	rows, err := db.Query(`SELECT position, tag FROM record_tags WHERE record_id = ? ORDER BY position`, record.ID.String())
-	if err != nil {
-		t.Fatalf("query tags error = %v", err)
-	}
-	defer rows.Close()
-	wantTags := []string{"performance", "cli"}
-	for position, want := range wantTags {
-		if !rows.Next() {
-			t.Fatalf("tag %d missing", position)
-		}
-		var gotPosition int
-		var gotTag string
-		if err := rows.Scan(&gotPosition, &gotTag); err != nil {
-			t.Fatalf("scan tag %d error = %v", position, err)
-		}
-		if gotPosition != position || gotTag != want {
-			t.Errorf("tag %d = %d/%q, want %d/%q", position, gotPosition, gotTag, position, want)
-		}
-	}
-	if rows.Next() {
-		t.Errorf("unexpected extra tag")
-	}
-	if err := rows.Err(); err != nil {
-		t.Fatalf("iterate tags error = %v", err)
+			var id, captureType, description, createdAt, updatedAt string
+			var project, frequency, impact, category, workaround sql.NullString
+			if err := db.QueryRow(`SELECT
+				id, capture_type, description, friction_project,
+				friction_frequency, friction_impact, friction_category,
+				friction_current_workaround, created_at, updated_at
+				FROM records WHERE id = ?`, capture.ID.String()).Scan(
+				&id, &captureType, &description, &project,
+				&frequency, &impact, &category, &workaround, &createdAt, &updatedAt,
+			); err != nil {
+				t.Fatalf("read stored capture error = %v", err)
+			}
+			if id != capture.ID.String() || captureType != capture.Type.String() || description != capture.Description {
+				t.Errorf("stored identity = %q/%q/%q", id, captureType, description)
+			}
+			if project != tt.wantProject || frequency != tt.wantFrequency || impact != tt.wantImpact ||
+				category != tt.wantCategory || workaround != tt.wantWorkaround {
+				t.Errorf("stored details = %#v/%#v/%#v/%#v/%#v", project, frequency, impact, category, workaround)
+			}
+			if createdAt != capture.CreatedAt.String() || updatedAt != capture.UpdatedAt.String() {
+				t.Errorf("stored timestamps = %q/%q", createdAt, updatedAt)
+			}
+		})
 	}
 }
 
-func TestCreateCaptureStoresAbsentOptionalValues(t *testing.T) {
+func TestCreateCaptureStoresAbsentOptionalFrictionText(t *testing.T) {
 	repository, db := openTestRepository(t)
-	record := newTestCapture(t, domain.CaptureInput{
-		Description: "Keep this thought",
-		Kind:        domain.CaptureKindThought,
-	}, 1)
-
-	if err := repository.CreateCapture(context.Background(), record); err != nil {
+	capture := newTestCapture(t, domain.CaptureTypeFriction, 4)
+	capture.Details.Friction.Project = nil
+	capture.Details.Friction.CurrentWorkaround = nil
+	if err := repository.CreateCapture(context.Background(), capture); err != nil {
 		t.Fatalf("CreateCapture() error = %v", err)
 	}
-	var project sql.NullString
-	var tagCount int
-	if err := db.QueryRow(`SELECT project FROM records WHERE id = ?`, record.ID.String()).Scan(&project); err != nil {
-		t.Fatalf("read project error = %v", err)
+	var project, workaround sql.NullString
+	if err := db.QueryRow(`SELECT friction_project, friction_current_workaround
+		FROM records WHERE id = ?`, capture.ID.String()).Scan(&project, &workaround); err != nil {
+		t.Fatalf("read optional friction text error = %v", err)
 	}
-	if project.Valid {
-		t.Errorf("project = %q, want NULL", project.String)
-	}
-	if err := db.QueryRow(`SELECT COUNT(*) FROM record_tags WHERE record_id = ?`, record.ID.String()).Scan(&tagCount); err != nil {
-		t.Fatalf("read tag count error = %v", err)
-	}
-	if tagCount != 0 {
-		t.Errorf("tag count = %d, want 0", tagCount)
+	if project.Valid || workaround.Valid {
+		t.Errorf("stored optional friction text = %#v/%#v, want NULL/NULL", project, workaround)
 	}
 }
 
-func TestCreateCaptureRollsBackDuplicateID(t *testing.T) {
+func TestCreateCaptureStoresMigratedFrictionID(t *testing.T) {
 	repository, db := openTestRepository(t)
-	record := newTestCapture(t, domain.CaptureInput{
-		Description: "Original",
-		Kind:        domain.CaptureKindThought,
-		Tags:        "original",
-	}, 2)
-	if err := repository.CreateCapture(context.Background(), record); err != nil {
+	capture := newTestCapture(t, domain.CaptureTypeFriction, 8)
+	capture.ID = "frc_08080808080808080808080808080808"
+	if err := repository.CreateCapture(context.Background(), capture); err != nil {
+		t.Fatalf("CreateCapture() error = %v", err)
+	}
+	var captureType string
+	if err := db.QueryRow(`SELECT capture_type FROM records WHERE id = ?`, capture.ID.String()).Scan(&captureType); err != nil {
+		t.Fatalf("read migrated friction error = %v", err)
+	}
+	if captureType != "friction" {
+		t.Errorf("capture type = %q, want friction", captureType)
+	}
+}
+
+func TestCreateCaptureDuplicatePreservesOriginal(t *testing.T) {
+	repository, db := openTestRepository(t)
+	original := newTestCapture(t, domain.CaptureTypeAction, 5)
+	if err := repository.CreateCapture(context.Background(), original); err != nil {
 		t.Fatalf("first CreateCapture() error = %v", err)
 	}
-
-	duplicate := record
-	duplicate.Description = "Duplicate"
-	duplicate.Details.Capture = &domain.CaptureDetails{
-		Kind: domain.CaptureKindIdea,
-		Tags: []string{"duplicate"},
-	}
+	duplicate := original
+	duplicate.Description = "Different description"
 	err := repository.CreateCapture(context.Background(), duplicate)
-	if err == nil || !strings.Contains(err.Error(), "insert capture "+record.ID.String()) {
+	if err == nil || !strings.Contains(err.Error(), "insert capture "+original.ID.String()) {
 		t.Fatalf("duplicate CreateCapture() error = %v", err)
 	}
-	assertRecordAndTagCounts(t, db, 1, 1)
-
-	var description, tag string
-	if err := db.QueryRow(`SELECT description FROM records WHERE id = ?`, record.ID.String()).Scan(&description); err != nil {
-		t.Fatalf("read description error = %v", err)
+	var count int
+	var description string
+	if err := db.QueryRow(`SELECT COUNT(*), description FROM records WHERE id = ?`, original.ID.String()).Scan(&count, &description); err != nil {
+		t.Fatalf("read duplicate state error = %v", err)
 	}
-	if err := db.QueryRow(`SELECT tag FROM record_tags WHERE record_id = ?`, record.ID.String()).Scan(&tag); err != nil {
-		t.Fatalf("read tag error = %v", err)
-	}
-	if description != "Original" || tag != "original" {
-		t.Errorf("stored duplicate state = %q/%q, want original", description, tag)
+	if count != 1 || description != original.Description {
+		t.Errorf("duplicate state = %d/%q, want 1/%q", count, description, original.Description)
 	}
 }
 
-func TestCreateCaptureRollsBackTagFailure(t *testing.T) {
+func TestCreateCaptureRejectsInvalidBeforeDatabaseAccess(t *testing.T) {
 	repository, db := openTestRepository(t)
-	if _, err := db.Exec(`CREATE TRIGGER reject_blocked_tag
-		BEFORE INSERT ON record_tags WHEN NEW.tag = 'blocked'
-		BEGIN SELECT RAISE(ABORT, 'blocked test tag'); END`); err != nil {
-		t.Fatalf("create test trigger error = %v", err)
+	capture := newTestCapture(t, domain.CaptureTypeDecision, 6)
+	capture.Description = " invalid "
+	err := repository.CreateCapture(context.Background(), capture)
+	var invalid *domain.InvalidValueError
+	if !errors.As(err, &invalid) || !strings.Contains(err.Error(), "validate capture") {
+		t.Fatalf("CreateCapture() error = %T %v, want wrapped validation error", err, err)
 	}
-	record := newTestCapture(t, domain.CaptureInput{
-		Description: "Must roll back",
-		Kind:        domain.CaptureKindThought,
-		Tags:        "first,blocked",
-	}, 3)
-
-	err := repository.CreateCapture(context.Background(), record)
-	if err == nil || !strings.Contains(err.Error(), "tag 1") {
-		t.Fatalf("CreateCapture() error = %v, want tag error", err)
-	}
-	assertRecordAndTagCounts(t, db, 0, 0)
+	assertRecordCount(t, db, 0)
 }
 
-func TestCreateCaptureRejectsInvalidRecord(t *testing.T) {
+func TestCreateCaptureHonorsCancelledContext(t *testing.T) {
 	repository, db := openTestRepository(t)
-	record := newTestCapture(t, domain.CaptureInput{
-		Description: "Valid first",
-		Kind:        domain.CaptureKindThought,
-	}, 4)
-	record.Description = " "
-
-	err := repository.CreateCapture(context.Background(), record)
-	if err == nil || !strings.Contains(err.Error(), "validate capture") {
-		t.Fatalf("CreateCapture() error = %v, want validation error", err)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := repository.CreateCapture(ctx, newTestCapture(t, domain.CaptureTypeFollowUp, 7))
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("CreateCapture() error = %v, want context.Canceled", err)
 	}
-	assertRecordAndTagCounts(t, db, 0, 0)
-}
-
-func TestNewRejectsNilDatabase(t *testing.T) {
-	repository, err := New(nil)
-	if repository != nil {
-		t.Fatalf("New() = %#v, want nil", repository)
-	}
-	if err == nil || err.Error() != "sqlite database is required" {
-		t.Fatalf("New() error = %v", err)
-	}
+	assertRecordCount(t, db, 0)
 }
 
 func openTestRepository(t *testing.T) (*Repository, *sql.DB) {
@@ -197,27 +158,19 @@ func openTestRepository(t *testing.T) (*Repository, *sql.DB) {
 	if err != nil {
 		t.Fatalf("PrepareDataDirectory() error = %v", err)
 	}
-	t.Cleanup(func() { directory.Close() })
+	t.Cleanup(func() { _ = directory.Close() })
 	database, err := storage.OpenDatabaseFile(directory, storage.DatabaseCreate, os.Geteuid())
 	if err != nil {
 		t.Fatalf("OpenDatabaseFile() error = %v", err)
 	}
-	t.Cleanup(func() { database.Close() })
+	t.Cleanup(func() { _ = database.Close() })
 	db, err := storage.OpenSQLite(context.Background(), directory, database, storage.DatabaseCreate)
 	if err != nil {
 		t.Fatalf("OpenSQLite() error = %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
-	query, err := forgemigrations.Files.ReadFile("001_initial.sql")
-	if err != nil {
-		t.Fatalf("read initial migration error = %v", err)
-	}
-	if _, err := db.Exec(string(query)); err != nil {
-		t.Fatalf("apply initial migration error = %v", err)
-	}
-	if _, err := db.Exec(`INSERT INTO schema_migrations(version, name, applied_at)
-		VALUES (1, '001_initial.sql', '2026-08-25T12:00:00.000Z')`); err != nil {
-		t.Fatalf("record initial migration error = %v", err)
+	t.Cleanup(func() { _ = db.Close() })
+	if err := storage.ApplyMigrations(context.Background(), db); err != nil {
+		t.Fatalf("ApplyMigrations() error = %v", err)
 	}
 	repository, err := New(db)
 	if err != nil {
@@ -226,29 +179,50 @@ func openTestRepository(t *testing.T) (*Repository, *sql.DB) {
 	return repository, db
 }
 
-func newTestCapture(t *testing.T, input domain.CaptureInput, seed byte) domain.Record {
+func newTestCapture(t *testing.T, captureType domain.CaptureType, seed byte) domain.Capture {
 	t.Helper()
-	record, err := domain.NewCapture(
-		input,
-		time.Date(2026, time.August, 25, 9, 14, int(seed), 123456000, time.UTC),
+	input := domain.ProposedCaptureInput{
+		Type:        captureType,
+		Description: " " + captureType.String(),
+	}
+	switch captureType {
+	case domain.CaptureTypeFriction:
+		input.Details.Friction = &domain.FrictionCaptureInput{
+			Project: "forge", Frequency: domain.FrequencyWeekly,
+			Impact: domain.ImpactHigh, Category: domain.CategoryVerification,
+			CurrentWorkaround: "Use a checklist",
+		}
+	case domain.CaptureTypeAction:
+		input.Details.Action = &domain.ActionCaptureDetails{}
+	case domain.CaptureTypeFollowUp:
+		input.Details.FollowUp = &domain.FollowUpCaptureDetails{}
+	case domain.CaptureTypeDecision:
+		input.Details.Decision = &domain.DecisionCaptureDetails{}
+	default:
+		t.Fatalf("unsupported capture type %q", captureType)
+	}
+	proposed, err := domain.NewProposedCapture(input)
+	if err != nil {
+		t.Fatalf("NewProposedCapture() error = %v", err)
+	}
+	capture, err := domain.NewPersistedCapture(
+		proposed,
+		time.Date(2026, time.August, 25, 12, 0, int(seed), 123456000, time.UTC),
 		bytes.NewReader(bytes.Repeat([]byte{seed}, 16)),
 	)
 	if err != nil {
-		t.Fatalf("NewCapture() error = %v", err)
+		t.Fatalf("NewPersistedCapture() error = %v", err)
 	}
-	return record
+	return capture
 }
 
-func assertRecordAndTagCounts(t *testing.T, db *sql.DB, wantRecords, wantTags int) {
+func assertRecordCount(t *testing.T, db *sql.DB, want int) {
 	t.Helper()
-	var records, tags int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM records`).Scan(&records); err != nil {
+	var got int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM records`).Scan(&got); err != nil {
 		t.Fatalf("read record count error = %v", err)
 	}
-	if err := db.QueryRow(`SELECT COUNT(*) FROM record_tags`).Scan(&tags); err != nil {
-		t.Fatalf("read tag count error = %v", err)
-	}
-	if records != wantRecords || tags != wantTags {
-		t.Errorf("record/tag counts = %d/%d, want %d/%d", records, tags, wantRecords, wantTags)
+	if got != want {
+		t.Errorf("record count = %d, want %d", got, want)
 	}
 }

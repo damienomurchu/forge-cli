@@ -11,15 +11,19 @@ import (
 	"github.com/damienomurchu/forge-cli/internal/domain"
 )
 
+type errorWriter struct{ err error }
+
+func (w errorWriter) Write([]byte) (int, error) { return 0, w.err }
+
 func TestWriteCaptureCreatedMatchesGolden(t *testing.T) {
 	for _, captureType := range domain.CaptureTypes() {
 		t.Run(captureType.String(), func(t *testing.T) {
-			want, err := os.ReadFile(filepath.Join("testdata", "unified-"+captureType.String()+"-created.golden"))
+			want, err := os.ReadFile(filepath.Join("testdata", ""+captureType.String()+"-created.golden"))
 			if err != nil {
 				t.Fatal(err)
 			}
 			var got bytes.Buffer
-			if err := WriteCaptureCreated(&got, unifiedCapture(t, captureType)); err != nil {
+			if err := WriteCaptureCreated(&got, testCapture(t, captureType)); err != nil {
 				t.Fatalf("WriteCaptureCreated() error = %v", err)
 			}
 			if got.String() != string(want) {
@@ -32,12 +36,12 @@ func TestWriteCaptureCreatedMatchesGolden(t *testing.T) {
 func TestWriteCaptureMatchesGolden(t *testing.T) {
 	for _, captureType := range domain.CaptureTypes() {
 		t.Run(captureType.String(), func(t *testing.T) {
-			want, err := os.ReadFile(filepath.Join("testdata", "unified-"+captureType.String()+"-show.golden"))
+			want, err := os.ReadFile(filepath.Join("testdata", ""+captureType.String()+"-show.golden"))
 			if err != nil {
 				t.Fatal(err)
 			}
 			var got bytes.Buffer
-			if err := WriteCapture(&got, unifiedCapture(t, captureType)); err != nil {
+			if err := WriteCapture(&got, testCapture(t, captureType)); err != nil {
 				t.Fatalf("WriteCapture() error = %v", err)
 			}
 			if got.String() != string(want) {
@@ -48,7 +52,7 @@ func TestWriteCaptureMatchesGolden(t *testing.T) {
 }
 
 func TestWriteCaptureShowsAbsentFrictionText(t *testing.T) {
-	capture := unifiedCapture(t, domain.CaptureTypeFriction)
+	capture := testCapture(t, domain.CaptureTypeFriction)
 	capture.Details.Friction.Project = nil
 	capture.Details.Friction.CurrentWorkaround = nil
 	var got bytes.Buffer
@@ -63,7 +67,7 @@ func TestWriteCaptureShowsAbsentFrictionText(t *testing.T) {
 }
 
 func TestWriteCaptureEscapesUserText(t *testing.T) {
-	capture := unifiedCapture(t, domain.CaptureTypeFriction)
+	capture := testCapture(t, domain.CaptureTypeFriction)
 	capture.Description = "manual\nchecks\t\u202e"
 	project := "forge\r\u2066"
 	workaround := "line one\\line two"
@@ -86,13 +90,13 @@ func TestWriteCaptureEscapesUserText(t *testing.T) {
 
 func TestWriteCaptureListMatchesGoldenAndPreservesOrder(t *testing.T) {
 	captures := []domain.Capture{
-		unifiedCapture(t, domain.CaptureTypeDecision),
-		unifiedCapture(t, domain.CaptureTypeFriction),
-		unifiedCapture(t, domain.CaptureTypeAction),
-		unifiedCapture(t, domain.CaptureTypeFollowUp),
+		testCapture(t, domain.CaptureTypeDecision),
+		testCapture(t, domain.CaptureTypeFriction),
+		testCapture(t, domain.CaptureTypeAction),
+		testCapture(t, domain.CaptureTypeFollowUp),
 	}
 	captures[1].ID = "frc_00000000000000000000000000000000"
-	want, err := os.ReadFile(filepath.Join("testdata", "unified-list.golden"))
+	want, err := os.ReadFile(filepath.Join("testdata", "list.golden"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +110,7 @@ func TestWriteCaptureListMatchesGoldenAndPreservesOrder(t *testing.T) {
 }
 
 func TestWriteCaptureListEscapesDescriptions(t *testing.T) {
-	capture := unifiedCapture(t, domain.CaptureTypeAction)
+	capture := testCapture(t, domain.CaptureTypeAction)
 	capture.Description = "line one\nline two\t\u202e"
 	var got bytes.Buffer
 	if err := WriteCaptureList(&got, []domain.Capture{capture}); err != nil {
@@ -130,8 +134,8 @@ func TestWriteCaptureListEmpty(t *testing.T) {
 	}
 }
 
-func TestUnifiedCaptureHumanOutputValidatesBeforeWriting(t *testing.T) {
-	invalid := unifiedCapture(t, domain.CaptureTypeAction)
+func TestCaptureHumanOutputValidatesBeforeWriting(t *testing.T) {
+	invalid := testCapture(t, domain.CaptureTypeAction)
 	invalid.Description = " invalid "
 
 	tests := []struct {
@@ -141,7 +145,7 @@ func TestUnifiedCaptureHumanOutputValidatesBeforeWriting(t *testing.T) {
 		{name: "created", write: func(w *bytes.Buffer) error { return WriteCaptureCreated(w, invalid) }},
 		{name: "show", write: func(w *bytes.Buffer) error { return WriteCapture(w, invalid) }},
 		{name: "list", write: func(w *bytes.Buffer) error {
-			return WriteCaptureList(w, []domain.Capture{unifiedCapture(t, domain.CaptureTypeDecision), invalid})
+			return WriteCaptureList(w, []domain.Capture{testCapture(t, domain.CaptureTypeDecision), invalid})
 		}},
 	}
 	for _, tt := range tests {
@@ -156,9 +160,9 @@ func TestUnifiedCaptureHumanOutputValidatesBeforeWriting(t *testing.T) {
 	}
 }
 
-func TestUnifiedCaptureHumanOutputPropagatesWriterFailures(t *testing.T) {
+func TestCaptureHumanOutputPropagatesWriterFailures(t *testing.T) {
 	wantErr := errors.New("writer failed")
-	capture := unifiedCapture(t, domain.CaptureTypeAction)
+	capture := testCapture(t, domain.CaptureTypeAction)
 	tests := []struct {
 		name  string
 		write func() error

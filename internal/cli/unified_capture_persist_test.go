@@ -145,7 +145,7 @@ type recordingUnifiedCaptureCreator struct {
 	err      error
 }
 
-func (c *recordingUnifiedCaptureCreator) CreateUnifiedCapture(_ context.Context, capture domain.Capture) error {
+func (c *recordingUnifiedCaptureCreator) CreateCapture(_ context.Context, capture domain.Capture) error {
 	c.captures = append(c.captures, capture)
 	return c.err
 }

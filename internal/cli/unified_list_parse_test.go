@@ -22,7 +22,7 @@ func TestParseUnifiedListRequestDefaults(t *testing.T) {
 func TestParseUnifiedListRequestParsesSpacedAndEqualsFlags(t *testing.T) {
 	friction, project, limit := domain.CaptureTypeFriction, "forge", 12
 	want := unifiedListRequest{
-		filters: repository.UnifiedCaptureFilters{Type: &friction, Project: &project, Limit: &limit},
+		filters: repository.CaptureFilters{Type: &friction, Project: &project, Limit: &limit},
 		json:    true,
 	}
 	for _, args := range [][]string{

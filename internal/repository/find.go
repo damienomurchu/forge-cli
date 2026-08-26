@@ -9,69 +9,53 @@ import (
 	"github.com/damienomurchu/forge-cli/internal/domain"
 )
 
-// ErrRecordNotFound identifies a lookup for an ID that is not stored.
-var ErrRecordNotFound = errors.New("record not found")
+const captureColumns = `
+	id, capture_type, description, friction_project,
+	friction_frequency, friction_impact, friction_category,
+	friction_current_workaround, created_at, updated_at`
 
-const recordColumns = `
-	id, type, description, project, status,
-	capture_kind, friction_frequency, friction_impact,
-	friction_category, current_workaround, created_at, updated_at`
-
-type rowScanner interface {
-	Scan(dest ...any) error
-}
-
-type recordQueryer interface {
-	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
-}
-
-type storedRecord struct {
+type storedCapture struct {
 	id                string
-	recordType        string
+	captureType       string
 	description       string
 	project           sql.NullString
-	status            string
-	captureKind       sql.NullString
-	frictionFrequency sql.NullString
-	frictionImpact    sql.NullString
-	frictionCategory  sql.NullString
+	frequency         sql.NullString
+	impact            sql.NullString
+	category          sql.NullString
 	currentWorkaround sql.NullString
 	createdAt         string
 	updatedAt         string
 }
 
-// FindByID returns the complete record with id without modifying the database.
-func (r *Repository) FindByID(ctx context.Context, id domain.ID) (domain.Record, error) {
-	stored, err := scanStoredRecord(r.db.QueryRowContext(ctx,
-		`SELECT `+recordColumns+` FROM records WHERE id = ?`,
+// FindByID returns one complete capture without modifying the database.
+func (r *Repository) FindByID(ctx context.Context, id domain.ID) (domain.Capture, error) {
+	stored, err := scanStoredCapture(r.db.QueryRowContext(ctx,
+		`SELECT `+captureColumns+` FROM records WHERE id = ?`,
 		id.String(),
 	))
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.Record{}, ErrRecordNotFound
+		return domain.Capture{}, ErrRecordNotFound
 	}
 	if err != nil {
-		return domain.Record{}, fmt.Errorf("find record: %w", err)
+		return domain.Capture{}, fmt.Errorf("find capture: %w", err)
 	}
-
-	record, err := r.decodeStoredRecord(ctx, stored)
+	capture, err := decodeStoredCapture(stored)
 	if err != nil {
-		return domain.Record{}, fmt.Errorf("decode stored record: %w", err)
+		return domain.Capture{}, fmt.Errorf("decode stored capture: %w", err)
 	}
-	return record, nil
+	return capture, nil
 }
 
-func scanStoredRecord(scanner rowScanner) (storedRecord, error) {
-	var stored storedRecord
+func scanStoredCapture(scanner rowScanner) (storedCapture, error) {
+	var stored storedCapture
 	err := scanner.Scan(
 		&stored.id,
-		&stored.recordType,
+		&stored.captureType,
 		&stored.description,
 		&stored.project,
-		&stored.status,
-		&stored.captureKind,
-		&stored.frictionFrequency,
-		&stored.frictionImpact,
-		&stored.frictionCategory,
+		&stored.frequency,
+		&stored.impact,
+		&stored.category,
 		&stored.currentWorkaround,
 		&stored.createdAt,
 		&stored.updatedAt,
@@ -79,116 +63,66 @@ func scanStoredRecord(scanner rowScanner) (storedRecord, error) {
 	return stored, err
 }
 
-func (r *Repository) decodeStoredRecord(ctx context.Context, stored storedRecord) (domain.Record, error) {
-	return decodeStoredRecord(ctx, r.db, stored)
-}
-
-func decodeStoredRecord(ctx context.Context, queryer recordQueryer, stored storedRecord) (domain.Record, error) {
-	recordType, err := domain.ParseRecordType(stored.recordType)
+func decodeStoredCapture(stored storedCapture) (domain.Capture, error) {
+	captureType, err := domain.ParseCaptureType(stored.captureType)
 	if err != nil {
-		return domain.Record{}, err
-	}
-	status, err := domain.ParseStatus(stored.status)
-	if err != nil {
-		return domain.Record{}, err
+		return domain.Capture{}, err
 	}
 	createdAt, err := domain.ParseTimestamp(stored.createdAt)
 	if err != nil {
-		return domain.Record{}, err
+		return domain.Capture{}, err
 	}
 	updatedAt, err := domain.ParseTimestamp(stored.updatedAt)
 	if err != nil {
-		return domain.Record{}, err
+		return domain.Capture{}, err
 	}
 
-	record := domain.Record{
+	capture := domain.Capture{
 		ID:          domain.ID(stored.id),
-		Type:        recordType,
+		Type:        captureType,
 		Description: stored.description,
-		Project:     stringPointerFromNull(stored.project),
-		Status:      status,
 		CreatedAt:   createdAt,
 		UpdatedAt:   updatedAt,
 	}
-
-	switch recordType {
-	case domain.RecordTypeCapture:
-		if !stored.captureKind.Valid || stored.frictionFrequency.Valid ||
-			stored.frictionImpact.Valid || stored.frictionCategory.Valid ||
-			stored.currentWorkaround.Valid {
-			return domain.Record{}, fmt.Errorf("invalid capture column shape")
+	if captureType == domain.CaptureTypeFriction {
+		if !stored.frequency.Valid || !stored.impact.Valid || !stored.category.Valid {
+			return domain.Capture{}, fmt.Errorf("invalid friction column shape")
 		}
-		kind, err := domain.ParseCaptureKind(stored.captureKind.String)
+		frequency, err := domain.ParseFrequency(stored.frequency.String)
 		if err != nil {
-			return domain.Record{}, err
+			return domain.Capture{}, err
 		}
-		tags, err := loadCaptureTags(ctx, queryer, record.ID)
+		impact, err := domain.ParseImpact(stored.impact.String)
 		if err != nil {
-			return domain.Record{}, err
+			return domain.Capture{}, err
 		}
-		record.Details.Capture = &domain.CaptureDetails{Kind: kind, Tags: tags}
-	case domain.RecordTypeFriction:
-		if stored.captureKind.Valid || !stored.frictionFrequency.Valid ||
-			!stored.frictionImpact.Valid || !stored.frictionCategory.Valid {
-			return domain.Record{}, fmt.Errorf("invalid friction column shape")
-		}
-		frequency, err := domain.ParseFrequency(stored.frictionFrequency.String)
+		category, err := domain.ParseCategory(stored.category.String)
 		if err != nil {
-			return domain.Record{}, err
+			return domain.Capture{}, err
 		}
-		impact, err := domain.ParseImpact(stored.frictionImpact.String)
-		if err != nil {
-			return domain.Record{}, err
-		}
-		category, err := domain.ParseCategory(stored.frictionCategory.String)
-		if err != nil {
-			return domain.Record{}, err
-		}
-		record.Details.Friction = &domain.FrictionDetails{
+		capture.Details.Friction = &domain.FrictionCaptureDetails{
+			Project:           stringPointerFromNull(stored.project),
 			Frequency:         frequency,
 			Impact:            impact,
 			Category:          category,
 			CurrentWorkaround: stringPointerFromNull(stored.currentWorkaround),
 		}
-	}
-
-	if err := record.Validate(); err != nil {
-		return domain.Record{}, err
-	}
-	return record, nil
-}
-
-func loadCaptureTags(ctx context.Context, queryer recordQueryer, id domain.ID) ([]string, error) {
-	rows, err := queryer.QueryContext(ctx,
-		`SELECT position, tag FROM record_tags WHERE record_id = ? ORDER BY position ASC`,
-		id.String(),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("load capture tags: %w", err)
-	}
-	defer rows.Close()
-
-	tags := make([]string, 0)
-	for rows.Next() {
-		var position int
-		var tag string
-		if err := rows.Scan(&position, &tag); err != nil {
-			return nil, fmt.Errorf("scan capture tag: %w", err)
+	} else {
+		if stored.project.Valid || stored.frequency.Valid || stored.impact.Valid ||
+			stored.category.Valid || stored.currentWorkaround.Valid {
+			return domain.Capture{}, fmt.Errorf("invalid %s column shape", captureType)
 		}
-		if position != len(tags) {
-			return nil, fmt.Errorf("capture tag position %d is not contiguous", position)
+		switch captureType {
+		case domain.CaptureTypeAction:
+			capture.Details.Action = &domain.ActionCaptureDetails{}
+		case domain.CaptureTypeFollowUp:
+			capture.Details.FollowUp = &domain.FollowUpCaptureDetails{}
+		case domain.CaptureTypeDecision:
+			capture.Details.Decision = &domain.DecisionCaptureDetails{}
 		}
-		tags = append(tags, tag)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate capture tags: %w", err)
+	if err := capture.Validate(); err != nil {
+		return domain.Capture{}, err
 	}
-	return tags, nil
-}
-
-func stringPointerFromNull(value sql.NullString) *string {
-	if !value.Valid {
-		return nil
-	}
-	return &value.String
+	return capture, nil
 }

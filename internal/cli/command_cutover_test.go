@@ -170,7 +170,7 @@ func TestCaptureRejectsInvalidOrNonTerminalInputBeforeStorage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			rt := Runtime{
 				Stdout: io.Discard, Stderr: io.Discard, IsTTY: tt.isTTY,
-				Env: func(string) string { t.Fatal("rejected capture inspected environment"); return "" },
+				Env:    func(string) string { t.Fatal("rejected capture inspected environment"); return "" },
 				Prompt: func() Prompt { t.Fatal("rejected capture constructed prompt"); return nil },
 			}
 			if err := Run(context.Background(), tt.args, rt, "dev"); err == nil {

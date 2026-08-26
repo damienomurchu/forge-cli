@@ -1,11 +1,10 @@
-ID: frc_f2308c1797cf4e77ac076e6af5ff1616
+ID: cap_00000000000000000000000000000000
 Type: friction
-Description: Releases require repeated manual checks
-Project: -
-Status: reviewing
-Frequency: monthly
+Description: Releases require manual checks
+Project: forge
+Frequency: weekly
 Impact: high
 Category: verification
-Current workaround: -
-Created: 2026-08-25T09:18:41.654321Z
-Updated: 2026-08-26T11:02:19.000000Z
+Current workaround: (none)
+Created: 2026-08-25T12:00:00.000000Z
+Updated: 2026-08-25T12:00:00.000000Z
