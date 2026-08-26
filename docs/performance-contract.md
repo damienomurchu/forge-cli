@@ -38,9 +38,9 @@ The report contains, for each command:
 - peak RSS where the host `time` implementation exposes it
 - executable size
 
-The initial harness measures `--help` and `--version`. Database-backed cases are
-added when the executable supports them, using generated empty, small, and large
-fixtures with documented record counts and generation seeds.
+The harness currently measures `--help` and `--version`. It does not yet enforce
+the database-command budget. Adding isolated, deterministic database fixtures and
+representative capture, list, and show cases remains required before release.
 
 ## Isolation
 

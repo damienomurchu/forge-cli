@@ -17,8 +17,8 @@ typed details, future lifecycle, and review behavior.
 All fields are present. Timestamps use fixed-width UTC RFC 3339 with six fractional
 digits, for example `2026-08-25T12:34:56.123456Z`.
 
-There is no universal public `status` field in the reset model. Lifecycle fields
-will be added per capture type only after its review contract is approved.
+There is no universal public `status` field in the current model. Lifecycle fields
+will be added per capture type only after its review requirements are approved.
 
 ## Type-specific details
 
@@ -44,10 +44,9 @@ empty string.
 
 ## IDs
 
-IDs are opaque outside the domain generator. New unified captures use a stable
-capture identifier form chosen by the implementation and protected by domain
-tests. Command parsing must not infer capture type, timestamp, or validity from an
-ID prefix.
+IDs are opaque outside the domain generator. New captures use a stable identifier
+form chosen by the implementation and protected by domain tests. Command parsing
+must not infer capture type, timestamp, or validity from an ID prefix.
 
 Migration 002 preserves IDs of migration-001 rows. JSON consumers must therefore
 treat IDs as opaque and must not depend on one prefix or length.

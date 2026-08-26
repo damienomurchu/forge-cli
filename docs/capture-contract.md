@@ -53,20 +53,6 @@ Quick and interactive capture use the same finalized domain input, validation,
 record construction, atomic repository operation, and result rendering. Quick mode
 must not construct prompt machinery.
 
-Implementation status: the live capture command uses `parseCaptureRequest`,
-`collectCapture`, `persistCapture`, the schema-2 repository, and shared output.
-The parser finalizes every quick type into a validated `ProposedCapture`, preserves JSON intent,
-applies friction defaults, rejects duplicate or type-inappropriate flags, and
-returns normalized description-only intent for interactive collection. The
-collector prompts for the type and only its relevant fields, constructs the same
-validated proposal, writes the shared summary, and requires confirmation. Neither
-boundary generates persistence metadata or accesses storage. The
-`persistCapture` boundary adds metadata to a confirmed proposal, stores it
-through the capture repository, and writes the shared human or JSON result. It
-does not own storage session setup; the live handler opens storage only after
-quick validation or interactive confirmation and withholds result output until
-the session closes successfully.
-
 ## Friction details
 
 Friction supports:
@@ -100,7 +86,7 @@ are usage errors rather than silently ignored input.
 
 Action, follow-up, and decision initially have no additional fields. Their details
 remain explicitly typed in the domain and JSON model but are empty. Do not add
-lifecycle or review metadata until review contracts define it.
+lifecycle or review metadata until approved review requirements define it.
 
 ## Result
 

@@ -11,12 +11,12 @@ forge --help
 forge --version
 forge capture [capture options] DESCRIPTION
 forge list [--limit N] [--type TYPE] [--project PROJECT] [--json]
-forge show RECORD_ID [--json]
+forge show [--json] RECORD_ID
 ```
 
-The intended `forge review <type>` family is reserved but not yet specified or
-implemented. There is no top-level `forge friction` command and no generic
-`forge update` command. They must not appear in help as available commands.
+Type-aware review is not yet specified or implemented. There is no top-level
+`forge friction` command and no generic `forge update` command. They must not
+appear in help as available commands.
 
 ## Help and version
 
@@ -67,3 +67,43 @@ changing a top-level shape requires a major-version decision.
 Unknown commands and flags, extra positionals, missing required positionals, and
 missing flag values are usage errors. An understood command with an invalid domain
 value is a validation failure.
+
+## List
+
+```text
+forge list [--limit N] [--type TYPE] [--project PROJECT] [--json]
+```
+
+With no filters, list returns every capture. Filters combine with AND semantics.
+`--type` accepts one of the four capture types. `--project` matches normalized
+friction projects and therefore returns only friction captures. `--limit` must be
+positive and applies after filtering and ordering. Invalid filter values are
+validation failures.
+
+Results use `created_at DESC, id DESC`. Human mode emits one terminal-safe line per
+capture with no heading:
+
+```text
+<id>  <capture-type>  <description>
+```
+
+An empty human result writes nothing. JSON emits a complete record array, including
+`[]` when empty. List is read-only and treats missing storage as an empty result.
+
+## Show
+
+```text
+forge show [--json] RECORD_ID
+```
+
+Exactly one record ID is required. Duplicate `--json`, a value supplied to it,
+unknown flags, and extra positionals are usage errors.
+
+The ID is opaque. It must contain non-whitespace text and no control characters and
+is not silently trimmed. Lexical violations are validation failures and perform no
+storage lookup.
+
+Human mode writes every common and type-specific field in a terminal-safe layout.
+JSON emits the record defined by `docs/record-contract.md`. A missing ID reports a
+not-found error on stderr and emits nothing to stdout. Show is read-only, does not
+modify or migrate storage, and treats missing storage as not found.
