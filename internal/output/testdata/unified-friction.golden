@@ -1,0 +1,1 @@
+{"id":"cap_00000000000000000000000000000000","capture_type":"friction","description":"Releases require manual checks","details":{"project":"forge","frequency":"weekly","impact":"high","category":"verification","current_workaround":null},"created_at":"2026-08-25T12:00:00.000000Z","updated_at":"2026-08-25T12:00:00.000000Z"}
