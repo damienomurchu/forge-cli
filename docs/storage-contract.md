@@ -119,6 +119,11 @@ FindByID(ctx, id)
 List(ctx, filters)
 ```
 
+Implementation status: unified schema creation is available as the transitional
+`CreateUnifiedCapture(ctx, capture)` method and is tested against staged schema 2.
+The legacy schema-1 method already owns the final `CreateCapture` name. Rename the
+unified method only when legacy callers are removed during cutover.
+
 Creation inserts common and matching typed values atomically. Reads validate the
 complete stored shape; malformed rows fail rather than being partially decoded.
 
