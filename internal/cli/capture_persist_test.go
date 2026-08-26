@@ -12,20 +12,20 @@ import (
 	"github.com/damienomurchu/forge-cli/internal/domain"
 )
 
-func TestPersistUnifiedCaptureStoresAndWritesEveryType(t *testing.T) {
+func TestPersistCaptureStoresAndWritesEveryType(t *testing.T) {
 	now := time.Date(2026, time.August, 26, 14, 15, 16, 123456000, time.UTC)
 	for index, captureType := range domain.CaptureTypes() {
 		captureType := captureType
 		t.Run(captureType.String(), func(t *testing.T) {
-			proposal := unifiedProposalForPersistence(t, captureType)
-			creator := &recordingUnifiedCaptureCreator{}
+			proposal := proposalForPersistence(t, captureType)
+			creator := &recordingCaptureCreator{}
 			var stdout bytes.Buffer
-			capture, err := persistUnifiedCapture(
+			capture, err := persistCapture(
 				context.Background(), proposal, false, now,
 				bytes.NewReader(bytes.Repeat([]byte{byte(index + 1)}, 16)), creator, &stdout,
 			)
 			if err != nil {
-				t.Fatalf("persistUnifiedCapture() error = %v", err)
+				t.Fatalf("persistCapture() error = %v", err)
 			}
 			if len(creator.captures) != 1 || creator.captures[0] != capture {
 				t.Fatalf("stored captures = %#v, returned %#v", creator.captures, capture)
@@ -44,16 +44,16 @@ func TestPersistUnifiedCaptureStoresAndWritesEveryType(t *testing.T) {
 	}
 }
 
-func TestPersistUnifiedCaptureWritesJSON(t *testing.T) {
-	creator := &recordingUnifiedCaptureCreator{}
+func TestPersistCaptureWritesJSON(t *testing.T) {
+	creator := &recordingCaptureCreator{}
 	var stdout bytes.Buffer
-	capture, err := persistUnifiedCapture(
-		context.Background(), unifiedProposalForPersistence(t, domain.CaptureTypeAction), true,
+	capture, err := persistCapture(
+		context.Background(), proposalForPersistence(t, domain.CaptureTypeAction), true,
 		time.Date(2026, time.August, 26, 14, 0, 0, 0, time.UTC), bytes.NewReader(make([]byte, 16)),
 		creator, &stdout,
 	)
 	if err != nil {
-		t.Fatalf("persistUnifiedCapture() error = %v", err)
+		t.Fatalf("persistCapture() error = %v", err)
 	}
 	want := `{"id":"` + capture.ID.String() + `","capture_type":"action","description":"description","details":{},"created_at":"2026-08-26T14:00:00.000000Z","updated_at":"2026-08-26T14:00:00.000000Z"}` + "\n"
 	if stdout.String() != want {
@@ -61,7 +61,7 @@ func TestPersistUnifiedCaptureWritesJSON(t *testing.T) {
 	}
 }
 
-func TestPersistUnifiedCaptureFailsBeforePersistenceForInvalidProposalOrMetadata(t *testing.T) {
+func TestPersistCaptureFailsBeforePersistenceForInvalidProposalOrMetadata(t *testing.T) {
 	wantRandomErr := errors.New("random failed")
 	tests := []struct {
 		name     string
@@ -70,13 +70,13 @@ func TestPersistUnifiedCaptureFailsBeforePersistenceForInvalidProposalOrMetadata
 		wantErr  error
 	}{
 		{name: "invalid proposal", proposal: domain.ProposedCapture{}, random: panicCaptureReader{}},
-		{name: "randomness", proposal: unifiedProposalForPersistence(t, domain.CaptureTypeDecision), random: failingCaptureReader{err: wantRandomErr}, wantErr: wantRandomErr},
+		{name: "randomness", proposal: proposalForPersistence(t, domain.CaptureTypeDecision), random: failingCaptureReader{err: wantRandomErr}, wantErr: wantRandomErr},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			creator := &recordingUnifiedCaptureCreator{}
+			creator := &recordingCaptureCreator{}
 			var stdout bytes.Buffer
-			capture, err := persistUnifiedCapture(
+			capture, err := persistCapture(
 				context.Background(), tt.proposal, false, time.Now(), tt.random, creator, &stdout,
 			)
 			if err == nil || (tt.wantErr != nil && !errors.Is(err, tt.wantErr)) {
@@ -89,12 +89,12 @@ func TestPersistUnifiedCaptureFailsBeforePersistenceForInvalidProposalOrMetadata
 	}
 }
 
-func TestPersistUnifiedCaptureRepositoryFailureWritesNothing(t *testing.T) {
+func TestPersistCaptureRepositoryFailureWritesNothing(t *testing.T) {
 	wantErr := errors.New("insert failed")
-	creator := &recordingUnifiedCaptureCreator{err: wantErr}
+	creator := &recordingCaptureCreator{err: wantErr}
 	var stdout bytes.Buffer
-	capture, err := persistUnifiedCapture(
-		context.Background(), unifiedProposalForPersistence(t, domain.CaptureTypeFollowUp), false,
+	capture, err := persistCapture(
+		context.Background(), proposalForPersistence(t, domain.CaptureTypeFollowUp), false,
 		time.Now(), bytes.NewReader(make([]byte, 16)), creator, &stdout,
 	)
 	if !errors.Is(err, wantErr) || capture != (domain.Capture{}) || stdout.Len() != 0 {
@@ -102,11 +102,11 @@ func TestPersistUnifiedCaptureRepositoryFailureWritesNothing(t *testing.T) {
 	}
 }
 
-func TestPersistUnifiedCaptureWriterFailureOccursAfterPersistence(t *testing.T) {
+func TestPersistCaptureWriterFailureOccursAfterPersistence(t *testing.T) {
 	wantErr := errors.New("write failed")
-	creator := &recordingUnifiedCaptureCreator{}
-	capture, err := persistUnifiedCapture(
-		context.Background(), unifiedProposalForPersistence(t, domain.CaptureTypeAction), false,
+	creator := &recordingCaptureCreator{}
+	capture, err := persistCapture(
+		context.Background(), proposalForPersistence(t, domain.CaptureTypeAction), false,
 		time.Now(), bytes.NewReader(make([]byte, 16)), creator, failingCaptureWriter{err: wantErr},
 	)
 	if !errors.Is(err, wantErr) || capture != (domain.Capture{}) {
@@ -117,20 +117,20 @@ func TestPersistUnifiedCaptureWriterFailureOccursAfterPersistence(t *testing.T) 
 	}
 }
 
-func TestPersistUnifiedCaptureRejectsMissingBoundaries(t *testing.T) {
-	proposal := unifiedProposalForPersistence(t, domain.CaptureTypeAction)
+func TestPersistCaptureRejectsMissingBoundaries(t *testing.T) {
+	proposal := proposalForPersistence(t, domain.CaptureTypeAction)
 	tests := []struct {
 		name    string
-		creator unifiedCaptureCreator
+		creator captureCreator
 		stdout  io.Writer
 		want    string
 	}{
 		{name: "repository", stdout: io.Discard, want: "repository is required"},
-		{name: "writer", creator: &recordingUnifiedCaptureCreator{}, want: "writer is required"},
+		{name: "writer", creator: &recordingCaptureCreator{}, want: "writer is required"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			capture, err := persistUnifiedCapture(
+			capture, err := persistCapture(
 				context.Background(), proposal, false, time.Now(), bytes.NewReader(make([]byte, 16)), tt.creator, tt.stdout,
 			)
 			if err == nil || !strings.Contains(err.Error(), tt.want) || capture != (domain.Capture{}) {
@@ -140,17 +140,17 @@ func TestPersistUnifiedCaptureRejectsMissingBoundaries(t *testing.T) {
 	}
 }
 
-type recordingUnifiedCaptureCreator struct {
+type recordingCaptureCreator struct {
 	captures []domain.Capture
 	err      error
 }
 
-func (c *recordingUnifiedCaptureCreator) CreateCapture(_ context.Context, capture domain.Capture) error {
+func (c *recordingCaptureCreator) CreateCapture(_ context.Context, capture domain.Capture) error {
 	c.captures = append(c.captures, capture)
 	return c.err
 }
 
-func unifiedProposalForPersistence(t *testing.T, captureType domain.CaptureType) domain.ProposedCapture {
+func proposalForPersistence(t *testing.T, captureType domain.CaptureType) domain.ProposedCapture {
 	t.Helper()
 	input := domain.ProposedCaptureInput{Type: captureType, Description: "description"}
 	switch captureType {

@@ -9,19 +9,19 @@ import (
 	"github.com/damienomurchu/forge-cli/internal/repository"
 )
 
-func TestParseUnifiedListRequestDefaults(t *testing.T) {
-	got, err := parseUnifiedListRequest(nil)
+func TestParseListRequestDefaults(t *testing.T) {
+	got, err := parseListRequest(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(got, unifiedListRequest{}) {
+	if !reflect.DeepEqual(got, listRequest{}) {
 		t.Errorf("request = %#v, want zero request", got)
 	}
 }
 
-func TestParseUnifiedListRequestParsesSpacedAndEqualsFlags(t *testing.T) {
+func TestParseListRequestParsesSpacedAndEqualsFlags(t *testing.T) {
 	friction, project, limit := domain.CaptureTypeFriction, "forge", 12
-	want := unifiedListRequest{
+	want := listRequest{
 		filters: repository.CaptureFilters{Type: &friction, Project: &project, Limit: &limit},
 		json:    true,
 	}
@@ -29,19 +29,19 @@ func TestParseUnifiedListRequestParsesSpacedAndEqualsFlags(t *testing.T) {
 		{"--type", "friction", "--project", "  forge  ", "--limit", "12", "--json"},
 		{"--json", "--limit=12", "--project=  forge  ", "--type=friction"},
 	} {
-		got, err := parseUnifiedListRequest(args)
+		got, err := parseListRequest(args)
 		if err != nil {
-			t.Fatalf("parseUnifiedListRequest(%q) error = %v", args, err)
+			t.Fatalf("parseListRequest(%q) error = %v", args, err)
 		}
 		if !reflect.DeepEqual(got, want) {
-			t.Errorf("parseUnifiedListRequest(%q) = %#v, want %#v", args, got, want)
+			t.Errorf("parseListRequest(%q) = %#v, want %#v", args, got, want)
 		}
 	}
 }
 
-func TestParseUnifiedListRequestAcceptsEveryCaptureType(t *testing.T) {
+func TestParseListRequestAcceptsEveryCaptureType(t *testing.T) {
 	for _, captureType := range domain.CaptureTypes() {
-		got, err := parseUnifiedListRequest([]string{"--type", captureType.String()})
+		got, err := parseListRequest([]string{"--type", captureType.String()})
 		if err != nil {
 			t.Fatalf("parse type %s error = %v", captureType, err)
 		}
@@ -51,7 +51,7 @@ func TestParseUnifiedListRequestAcceptsEveryCaptureType(t *testing.T) {
 	}
 }
 
-func TestParseUnifiedListRequestRejectsDuplicates(t *testing.T) {
+func TestParseListRequestRejectsDuplicates(t *testing.T) {
 	for _, tt := range []struct{ flag, value string }{
 		{flag: "--json"},
 		{flag: "--type", value: "action"},
@@ -67,7 +67,7 @@ func TestParseUnifiedListRequestRejectsDuplicates(t *testing.T) {
 			if tt.value != "" {
 				args = append(args, tt.value)
 			}
-			_, err := parseUnifiedListRequest(args)
+			_, err := parseListRequest(args)
 			var usage *UsageError
 			want := tt.flag + " may only be specified once"
 			if !errors.As(err, &usage) || err.Error() != want {
@@ -77,7 +77,7 @@ func TestParseUnifiedListRequestRejectsDuplicates(t *testing.T) {
 	}
 }
 
-func TestParseUnifiedListRequestRejectsUsageErrors(t *testing.T) {
+func TestParseListRequestRejectsUsageErrors(t *testing.T) {
 	tests := []struct {
 		name string
 		args []string
@@ -105,7 +105,7 @@ func TestParseUnifiedListRequestRejectsUsageErrors(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := parseUnifiedListRequest(tt.args)
+			_, err := parseListRequest(tt.args)
 			var usage *UsageError
 			if !errors.As(err, &usage) || err.Error() != tt.want {
 				t.Fatalf("error = %T %v, want usage %q", err, err, tt.want)
@@ -114,7 +114,7 @@ func TestParseUnifiedListRequestRejectsUsageErrors(t *testing.T) {
 	}
 }
 
-func TestParseUnifiedListRequestRejectsInvalidValues(t *testing.T) {
+func TestParseListRequestRejectsInvalidValues(t *testing.T) {
 	for _, tt := range []struct{ name, flag, value, field string }{
 		{name: "type", flag: "--type", value: "capture", field: "capture type"},
 		{name: "blank project", flag: "--project", value: "  ", field: "project"},
@@ -123,7 +123,7 @@ func TestParseUnifiedListRequestRejectsInvalidValues(t *testing.T) {
 		{name: "nonnumeric limit", flag: "--limit", value: "many", field: "limit"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := parseUnifiedListRequest([]string{tt.flag, tt.value})
+			_, err := parseListRequest([]string{tt.flag, tt.value})
 			var invalid *domain.InvalidValueError
 			if !errors.As(err, &invalid) || invalid.Field != tt.field || invalid.Value != tt.value {
 				t.Fatalf("error = %T %v, want invalid %s %q", err, err, tt.field, tt.value)
@@ -132,13 +132,13 @@ func TestParseUnifiedListRequestRejectsInvalidValues(t *testing.T) {
 	}
 }
 
-func TestParseUnifiedListRequestIsPure(t *testing.T) {
+func TestParseListRequestIsPure(t *testing.T) {
 	args := []string{"--type", "decision", "--project", " forge ", "--limit", "3", "--json"}
-	first, err := parseUnifiedListRequest(args)
+	first, err := parseListRequest(args)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := parseUnifiedListRequest(args)
+	second, err := parseListRequest(args)
 	if err != nil {
 		t.Fatal(err)
 	}

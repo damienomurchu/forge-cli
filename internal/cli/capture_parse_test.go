@@ -9,14 +9,14 @@ import (
 	"github.com/damienomurchu/forge-cli/internal/domain"
 )
 
-func TestParseUnifiedCaptureRequestFinalizesEveryQuickType(t *testing.T) {
+func TestParseCaptureRequestFinalizesEveryQuickType(t *testing.T) {
 	for _, captureType := range domain.CaptureTypes() {
 		t.Run(captureType.String(), func(t *testing.T) {
-			got, err := parseUnifiedCaptureRequest([]string{
+			got, err := parseCaptureRequest([]string{
 				"--quick", "--type", captureType.String(), "  description  ", "--json",
 			})
 			if err != nil {
-				t.Fatalf("parseUnifiedCaptureRequest() error = %v", err)
+				t.Fatalf("parseCaptureRequest() error = %v", err)
 			}
 			if !got.quick || !got.json || got.description != "description" || got.proposed == nil {
 				t.Fatalf("request = %#v", got)
@@ -31,8 +31,8 @@ func TestParseUnifiedCaptureRequestFinalizesEveryQuickType(t *testing.T) {
 	}
 }
 
-func TestParseUnifiedCaptureRequestAppliesAndOverridesFrictionDefaults(t *testing.T) {
-	defaults, err := parseUnifiedCaptureRequest([]string{"--quick", "--type=friction", "problem"})
+func TestParseCaptureRequestAppliesAndOverridesFrictionDefaults(t *testing.T) {
+	defaults, err := parseCaptureRequest([]string{"--quick", "--type=friction", "problem"})
 	if err != nil {
 		t.Fatalf("default parse error = %v", err)
 	}
@@ -42,7 +42,7 @@ func TestParseUnifiedCaptureRequestAppliesAndOverridesFrictionDefaults(t *testin
 		t.Errorf("default friction details = %#v", details)
 	}
 
-	overrides, err := parseUnifiedCaptureRequest([]string{
+	overrides, err := parseCaptureRequest([]string{
 		"--category=verification", "--quick", "--impact", "high",
 		"--project", "  forge  ", "--type", "friction",
 		"--frequency=weekly", "--current-workaround", "  Use a checklist  ", "problem",
@@ -59,39 +59,39 @@ func TestParseUnifiedCaptureRequestAppliesAndOverridesFrictionDefaults(t *testin
 	}
 }
 
-func TestParseUnifiedCaptureRequestNormalizesEmptyOptionalFrictionText(t *testing.T) {
-	got, err := parseUnifiedCaptureRequest([]string{
+func TestParseCaptureRequestNormalizesEmptyOptionalFrictionText(t *testing.T) {
+	got, err := parseCaptureRequest([]string{
 		"--quick", "--type", "friction", "--project=", "--current-workaround=", "problem",
 	})
 	if err != nil {
-		t.Fatalf("parseUnifiedCaptureRequest() error = %v", err)
+		t.Fatalf("parseCaptureRequest() error = %v", err)
 	}
 	if got.proposed.Details.Friction.Project != nil || got.proposed.Details.Friction.CurrentWorkaround != nil {
 		t.Errorf("optional friction text = %#v", got.proposed.Details.Friction)
 	}
 }
 
-func TestParseUnifiedCaptureRequestInteractiveIntent(t *testing.T) {
-	got, err := parseUnifiedCaptureRequest([]string{"--json", "  choose later  "})
+func TestParseCaptureRequestInteractiveIntent(t *testing.T) {
+	got, err := parseCaptureRequest([]string{"--json", "  choose later  "})
 	if err != nil {
-		t.Fatalf("parseUnifiedCaptureRequest() error = %v", err)
+		t.Fatalf("parseCaptureRequest() error = %v", err)
 	}
 	if got.quick || !got.json || got.description != "choose later" || got.proposed != nil {
 		t.Errorf("interactive request = %#v", got)
 	}
 }
 
-func TestParseUnifiedCaptureRequestOptionTerminator(t *testing.T) {
-	got, err := parseUnifiedCaptureRequest([]string{"--quick", "--type", "action", "--", "- investigate"})
+func TestParseCaptureRequestOptionTerminator(t *testing.T) {
+	got, err := parseCaptureRequest([]string{"--quick", "--type", "action", "--", "- investigate"})
 	if err != nil {
-		t.Fatalf("parseUnifiedCaptureRequest() error = %v", err)
+		t.Fatalf("parseCaptureRequest() error = %v", err)
 	}
 	if got.proposed == nil || got.proposed.Description != "- investigate" {
 		t.Errorf("proposal = %#v", got.proposed)
 	}
 }
 
-func TestParseUnifiedCaptureRequestRejectsModeAndTypeConflicts(t *testing.T) {
+func TestParseCaptureRequestRejectsModeAndTypeConflicts(t *testing.T) {
 	tests := []struct {
 		name string
 		args []string
@@ -106,7 +106,7 @@ func TestParseUnifiedCaptureRequestRejectsModeAndTypeConflicts(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := parseUnifiedCaptureRequest(tt.args)
+			_, err := parseCaptureRequest(tt.args)
 			var usage *UsageError
 			if !errors.As(err, &usage) || err.Error() != tt.want {
 				t.Fatalf("error = %T %v, want usage %q", err, err, tt.want)
@@ -115,7 +115,7 @@ func TestParseUnifiedCaptureRequestRejectsModeAndTypeConflicts(t *testing.T) {
 	}
 }
 
-func TestParseUnifiedCaptureRequestRejectsDuplicateFlags(t *testing.T) {
+func TestParseCaptureRequestRejectsDuplicateFlags(t *testing.T) {
 	flags := []struct {
 		flag, value string
 	}{
@@ -139,7 +139,7 @@ func TestParseUnifiedCaptureRequestRejectsDuplicateFlags(t *testing.T) {
 				args = append(args, tt.value)
 			}
 			args = append(args, "description")
-			_, err := parseUnifiedCaptureRequest(args)
+			_, err := parseCaptureRequest(args)
 			if err == nil || err.Error() != tt.flag+" may only be specified once" {
 				t.Fatalf("error = %v, want duplicate %s", err, tt.flag)
 			}
@@ -147,7 +147,7 @@ func TestParseUnifiedCaptureRequestRejectsDuplicateFlags(t *testing.T) {
 	}
 }
 
-func TestParseUnifiedCaptureRequestRejectsUsageErrors(t *testing.T) {
+func TestParseCaptureRequestRejectsUsageErrors(t *testing.T) {
 	tests := []struct {
 		name string
 		args []string
@@ -181,7 +181,7 @@ func TestParseUnifiedCaptureRequestRejectsUsageErrors(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := parseUnifiedCaptureRequest(tt.args)
+			_, err := parseCaptureRequest(tt.args)
 			var usage *UsageError
 			if !errors.As(err, &usage) || err.Error() != tt.want {
 				t.Fatalf("error = %T %v, want usage %q", err, err, tt.want)
@@ -190,7 +190,7 @@ func TestParseUnifiedCaptureRequestRejectsUsageErrors(t *testing.T) {
 	}
 }
 
-func TestParseUnifiedCaptureRequestRejectsInvalidDomainValues(t *testing.T) {
+func TestParseCaptureRequestRejectsInvalidDomainValues(t *testing.T) {
 	tests := []struct {
 		name, flag, value, field string
 	}{
@@ -205,27 +205,27 @@ func TestParseUnifiedCaptureRequestRejectsInvalidDomainValues(t *testing.T) {
 			if tt.flag == "--type" {
 				args = []string{"--quick", tt.flag, tt.value, "description"}
 			}
-			_, err := parseUnifiedCaptureRequest(args)
+			_, err := parseCaptureRequest(args)
 			var invalid *domain.InvalidValueError
 			if !errors.As(err, &invalid) || invalid.Field != tt.field || invalid.Value != tt.value {
 				t.Fatalf("error = %#v, want invalid %s %q", invalid, tt.field, tt.value)
 			}
 		})
 	}
-	_, err := parseUnifiedCaptureRequest([]string{"--quick", "--type", "action", " \t "})
+	_, err := parseCaptureRequest([]string{"--quick", "--type", "action", " \t "})
 	var invalid *domain.InvalidValueError
 	if !errors.As(err, &invalid) || invalid.Field != "description" {
 		t.Fatalf("blank description error = %v, want invalid description", err)
 	}
 }
 
-func TestParseUnifiedCaptureRequestIsPure(t *testing.T) {
+func TestParseCaptureRequestIsPure(t *testing.T) {
 	args := []string{"--quick", "--type", "action", "description"}
-	first, err := parseUnifiedCaptureRequest(args)
+	first, err := parseCaptureRequest(args)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := parseUnifiedCaptureRequest(args)
+	second, err := parseCaptureRequest(args)
 	if err != nil {
 		t.Fatal(err)
 	}

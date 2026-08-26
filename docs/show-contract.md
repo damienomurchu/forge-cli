@@ -7,7 +7,7 @@ forge show RECORD_ID [--json]
 ```
 
 Exactly one record ID is required. A missing ID, extra positional argument,
-unknown flag, or value supplied to `--json` is a usage error.
+unknown flag, duplicate `--json`, or value supplied to `--json` is a usage error.
 
 The ID is opaque. Parsing does not depend on a prefix, length, capture type, or
 timestamp. It must contain non-whitespace text, contain no control characters, and
@@ -26,7 +26,7 @@ Show is strictly read-only. It does not initialize or migrate storage, change
 timestamps, or alter type-specific details.
 
 Implementation status: the existing `parseShow` boundary already satisfies the
-reset syntax and opaque-ID validation rules. The live handler uses
-`executeUnifiedShow` with the capture repository and shared human or JSON
-renderers while retaining storage discovery, session setup, and user-facing
+reset syntax and opaque-ID validation rules. The live handler uses `executeShow`
+with the capture repository and shared human or JSON renderers while retaining
+storage discovery, session setup, and user-facing
 not-found presentation.

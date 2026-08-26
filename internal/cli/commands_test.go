@@ -18,7 +18,7 @@ import (
 	"github.com/damienomurchu/forge-cli/internal/storage"
 )
 
-func TestUnifiedCommandHelpMatchesGoldenFiles(t *testing.T) {
+func TestCommandHelpMatchesGoldenFiles(t *testing.T) {
 	tests := []struct {
 		name string
 		args []string
@@ -90,7 +90,7 @@ func TestVersionAndErrorPresentationRemainStable(t *testing.T) {
 	}
 }
 
-func TestQuickCaptureListAndShowUseUnifiedSchema(t *testing.T) {
+func TestQuickCaptureListAndShowUseCaptureSchema(t *testing.T) {
 	dataDirectory := filepath.Join(t.TempDir(), "forge-data")
 	for index, captureType := range domain.CaptureTypes() {
 		var stdout bytes.Buffer
@@ -99,7 +99,7 @@ func TestQuickCaptureListAndShowUseUnifiedSchema(t *testing.T) {
 			args = append(args, "--project", "forge", "--frequency", "weekly", "--impact", "high", "--category", "verification")
 		}
 		args = append(args, captureType.String()+" description")
-		rt := unifiedCommandRuntime(t, dataDirectory, &stdout, byte(index+1))
+		rt := commandRuntime(t, dataDirectory, &stdout, byte(index+1))
 		rt.Prompt = func() Prompt { t.Fatal("quick capture constructed prompt"); return nil }
 		if err := Run(context.Background(), args, rt, "dev"); err != nil {
 			t.Fatalf("capture %s error = %v", captureType, err)
@@ -110,7 +110,7 @@ func TestQuickCaptureListAndShowUseUnifiedSchema(t *testing.T) {
 	}
 
 	var listJSON bytes.Buffer
-	if err := Run(context.Background(), []string{"list", "--json"}, unifiedCommandRuntime(t, dataDirectory, &listJSON, 20), "dev"); err != nil {
+	if err := Run(context.Background(), []string{"list", "--json"}, commandRuntime(t, dataDirectory, &listJSON, 20), "dev"); err != nil {
 		t.Fatalf("list error = %v", err)
 	}
 	for _, captureType := range domain.CaptureTypes() {
@@ -120,7 +120,7 @@ func TestQuickCaptureListAndShowUseUnifiedSchema(t *testing.T) {
 	}
 
 	var frictionList bytes.Buffer
-	if err := Run(context.Background(), []string{"list", "--type", "friction", "--project", " forge "}, unifiedCommandRuntime(t, dataDirectory, &frictionList, 21), "dev"); err != nil {
+	if err := Run(context.Background(), []string{"list", "--type", "friction", "--project", " forge "}, commandRuntime(t, dataDirectory, &frictionList, 21), "dev"); err != nil {
 		t.Fatalf("filtered list error = %v", err)
 	}
 	lines := strings.Split(strings.TrimSpace(frictionList.String()), "\n")
@@ -129,7 +129,7 @@ func TestQuickCaptureListAndShowUseUnifiedSchema(t *testing.T) {
 	}
 	id := strings.Fields(lines[0])[0]
 	var shown bytes.Buffer
-	if err := Run(context.Background(), []string{"show", "--json", id}, unifiedCommandRuntime(t, dataDirectory, &shown, 22), "dev"); err != nil {
+	if err := Run(context.Background(), []string{"show", "--json", id}, commandRuntime(t, dataDirectory, &shown, 22), "dev"); err != nil {
 		t.Fatalf("show error = %v", err)
 	}
 	if !strings.Contains(shown.String(), `"capture_type":"friction"`) ||
@@ -201,7 +201,7 @@ func TestInteractiveFrictionPersistsAfterConfirmation(t *testing.T) {
 		textValues:   []string{"forge", "manual check"}, confirmed: true,
 	}
 	var stdout, stderr bytes.Buffer
-	rt := unifiedCommandRuntime(t, dataDirectory, &stdout, 30)
+	rt := commandRuntime(t, dataDirectory, &stdout, 30)
 	rt.Stderr = &stderr
 	rt.IsTTY = func() bool { return true }
 	rt.Prompt = func() Prompt { return prompter }
@@ -223,7 +223,7 @@ func TestListMissingStorageDoesNotCreateIt(t *testing.T) {
 			args, want = append(args, "--json"), "[]\n"
 		}
 		var stdout bytes.Buffer
-		if err := Run(context.Background(), args, unifiedCommandRuntime(t, dataDirectory, &stdout, 40), "dev"); err != nil {
+		if err := Run(context.Background(), args, commandRuntime(t, dataDirectory, &stdout, 40), "dev"); err != nil {
 			t.Fatalf("Run() error = %v", err)
 		}
 		if stdout.String() != want {
@@ -238,11 +238,11 @@ func TestListMissingStorageDoesNotCreateIt(t *testing.T) {
 func TestShowMissingCapturePreservesNotFoundPresentationBoundary(t *testing.T) {
 	dataDirectory := filepath.Join(t.TempDir(), "forge-data")
 	var discarded bytes.Buffer
-	if err := Run(context.Background(), []string{"capture", "--quick", "--type", "action", "stored"}, unifiedCommandRuntime(t, dataDirectory, &discarded, 50), "dev"); err != nil {
+	if err := Run(context.Background(), []string{"capture", "--quick", "--type", "action", "stored"}, commandRuntime(t, dataDirectory, &discarded, 50), "dev"); err != nil {
 		t.Fatal(err)
 	}
 	var stdout bytes.Buffer
-	err := Run(context.Background(), []string{"show", "missing"}, unifiedCommandRuntime(t, dataDirectory, &stdout, 51), "dev")
+	err := Run(context.Background(), []string{"show", "missing"}, commandRuntime(t, dataDirectory, &stdout, 51), "dev")
 	if err == nil || !strings.Contains(err.Error(), `record "missing" not found`) || stdout.Len() != 0 {
 		t.Fatalf("error/stdout = %v/%q", err, stdout.String())
 	}
@@ -252,13 +252,13 @@ func TestSchemaOneDatabaseRequiresMigrationForReadCommands(t *testing.T) {
 	dataDirectory := filepath.Join(t.TempDir(), "forge-data")
 	createSchemaOneDatabase(t, dataDirectory)
 	var stdout bytes.Buffer
-	err := Run(context.Background(), []string{"list"}, unifiedCommandRuntime(t, dataDirectory, &stdout, 60), "dev")
+	err := Run(context.Background(), []string{"list"}, commandRuntime(t, dataDirectory, &stdout, 60), "dev")
 	if !errors.Is(err, storage.ErrMigrationRequired) || stdout.Len() != 0 {
 		t.Fatalf("error/stdout = %v/%q, want migration required", err, stdout.String())
 	}
 }
 
-func unifiedCommandRuntime(t *testing.T, dataDirectory string, stdout *bytes.Buffer, randomByte byte) Runtime {
+func commandRuntime(t *testing.T, dataDirectory string, stdout *bytes.Buffer, randomByte byte) Runtime {
 	t.Helper()
 	return Runtime{
 		Stdout: stdout,

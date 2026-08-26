@@ -10,31 +10,31 @@ import (
 	"github.com/damienomurchu/forge-cli/internal/output"
 )
 
-// unifiedCaptureFinder is the repository boundary required to execute a
-// unified show request. repository.Repository satisfies it directly.
-type unifiedCaptureFinder interface {
+// captureFinder is the repository boundary required to execute a
+// show request. repository.Repository satisfies it directly.
+type captureFinder interface {
 	FindByID(context.Context, domain.ID) (domain.Capture, error)
 }
 
-// executeUnifiedShow finds and renders one unified capture. Command dispatch
+// executeShow finds and renders one capture. Command dispatch
 // remains responsible for storage discovery, session ownership, and presenting
 // a not-found error to the user.
-func executeUnifiedShow(
+func executeShow(
 	ctx context.Context,
 	id domain.ID,
 	jsonOutput bool,
-	finder unifiedCaptureFinder,
+	finder captureFinder,
 	stdout io.Writer,
 ) error {
 	if finder == nil {
-		return fmt.Errorf("find unified capture: repository is required")
+		return fmt.Errorf("find capture: repository is required")
 	}
 	if stdout == nil {
 		return fmt.Errorf("write show result: writer is required")
 	}
 	capture, err := finder.FindByID(ctx, id)
 	if err != nil {
-		return fmt.Errorf("find unified capture: %w", err)
+		return fmt.Errorf("find capture: %w", err)
 	}
 
 	var rendered bytes.Buffer

@@ -31,11 +31,11 @@ An empty human result writes nothing. JSON emits a complete record array followe
 by a newline, including `[]` when empty. Listing is strictly read-only and never
 initializes or migrates missing storage.
 
-Implementation status: the live list command uses `parseUnifiedListRequest` and
-`executeUnifiedList`. The parser produces unified
-repository filters, recognizes only the four capture types, normalizes project
+Implementation status: the live list command uses `parseListRequest` and
+`executeList`. The parser produces capture repository filters, recognizes only
+the four capture types, normalizes project
 values, validates positive limits, and rejects the removed universal status
-filter. The executor passes those filters to the
-capture repository and renders the shared human or JSON result without owning
+filter. The executor passes those filters to the capture repository and renders
+the shared human or JSON result without owning
 storage discovery or session setup. The live handler retains that ownership and
 keeps missing-storage reads non-creating.

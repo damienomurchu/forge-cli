@@ -11,30 +11,30 @@ import (
 	"github.com/damienomurchu/forge-cli/internal/repository"
 )
 
-// unifiedCaptureLister is the repository boundary required to execute a
-// unified list request. repository.Repository satisfies it directly.
-type unifiedCaptureLister interface {
+// captureLister is the repository boundary required to execute a
+// list request. repository.Repository satisfies it directly.
+type captureLister interface {
 	List(context.Context, repository.CaptureFilters) ([]domain.Capture, error)
 }
 
-// executeUnifiedList queries and renders a parsed unified list request.
+// executeList queries and renders a parsed list request.
 // Command dispatch remains responsible for storage discovery and session
 // ownership.
-func executeUnifiedList(
+func executeList(
 	ctx context.Context,
-	request unifiedListRequest,
-	lister unifiedCaptureLister,
+	request listRequest,
+	lister captureLister,
 	stdout io.Writer,
 ) error {
 	if lister == nil {
-		return fmt.Errorf("list unified captures: repository is required")
+		return fmt.Errorf("list captures: repository is required")
 	}
 	if stdout == nil {
 		return fmt.Errorf("write list result: writer is required")
 	}
 	captures, err := lister.List(ctx, request.filters)
 	if err != nil {
-		return fmt.Errorf("list unified captures: %w", err)
+		return fmt.Errorf("list captures: %w", err)
 	}
 
 	var rendered bytes.Buffer

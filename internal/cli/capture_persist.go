@@ -11,22 +11,22 @@ import (
 	"github.com/damienomurchu/forge-cli/internal/output"
 )
 
-// unifiedCaptureCreator is the repository boundary required to persist a
-// unified capture. repository.Repository satisfies it directly.
-type unifiedCaptureCreator interface {
+// captureCreator is the repository boundary required to persist a
+// capture. repository.Repository satisfies it directly.
+type captureCreator interface {
 	CreateCapture(context.Context, domain.Capture) error
 }
 
-// persistUnifiedCapture adds persistence metadata to a confirmed proposal,
+// persistCapture adds persistence metadata to a confirmed proposal,
 // stores it, and writes the requested success representation. Command dispatch
 // remains responsible for opening and closing storage.
-func persistUnifiedCapture(
+func persistCapture(
 	ctx context.Context,
 	proposed domain.ProposedCapture,
 	jsonOutput bool,
 	now time.Time,
 	random io.Reader,
-	creator unifiedCaptureCreator,
+	creator captureCreator,
 	stdout io.Writer,
 ) (domain.Capture, error) {
 	capture, err := domain.NewPersistedCapture(proposed, now, random)
@@ -34,13 +34,13 @@ func persistUnifiedCapture(
 		return domain.Capture{}, fmt.Errorf("create persisted capture: %w", err)
 	}
 	if creator == nil {
-		return domain.Capture{}, fmt.Errorf("persist unified capture: repository is required")
+		return domain.Capture{}, fmt.Errorf("persist capture: repository is required")
 	}
 	if stdout == nil {
 		return domain.Capture{}, fmt.Errorf("write capture result: writer is required")
 	}
 	if err := creator.CreateCapture(ctx, capture); err != nil {
-		return domain.Capture{}, fmt.Errorf("persist unified capture: %w", err)
+		return domain.Capture{}, fmt.Errorf("persist capture: %w", err)
 	}
 
 	var rendered bytes.Buffer

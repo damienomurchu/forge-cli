@@ -74,7 +74,7 @@ func (p *scriptedCapturePrompt) nextError() error {
 	return nil
 }
 
-func TestCollectUnifiedCaptureCollectsEveryType(t *testing.T) {
+func TestCollectCaptureCollectsEveryType(t *testing.T) {
 	for _, captureType := range domain.CaptureTypes() {
 		t.Run(captureType.String(), func(t *testing.T) {
 			prompter := &scriptedCapturePrompt{selectValues: []string{captureType.String()}, confirmed: true}
@@ -83,11 +83,11 @@ func TestCollectUnifiedCaptureCollectsEveryType(t *testing.T) {
 				prompter.textValues = []string{"  forge  ", "  Use a checklist  "}
 			}
 			var summary bytes.Buffer
-			got, confirmed, err := collectUnifiedCapture(
-				context.Background(), interactiveUnifiedCaptureRequest(), prompter, &summary,
+			got, confirmed, err := collectCapture(
+				context.Background(), interactiveCaptureRequest(), prompter, &summary,
 			)
 			if err != nil {
-				t.Fatalf("collectUnifiedCapture() error = %v", err)
+				t.Fatalf("collectCapture() error = %v", err)
 			}
 			if !confirmed || got.Type != captureType || got.Description != "description" {
 				t.Fatalf("capture/confirmed = %#v/%t", got, confirmed)
@@ -111,16 +111,16 @@ func TestCollectUnifiedCaptureCollectsEveryType(t *testing.T) {
 	}
 }
 
-func TestCollectUnifiedCaptureFrictionPromptOrderAndDefaults(t *testing.T) {
+func TestCollectCaptureFrictionPromptOrderAndDefaults(t *testing.T) {
 	prompter := &scriptedCapturePrompt{
 		selectValues: []string{"friction", "unknown", "unknown", "other"},
 		textValues:   []string{"", ""},
 		confirmed:    true,
 	}
 	var summary bytes.Buffer
-	_, _, err := collectUnifiedCapture(context.Background(), interactiveUnifiedCaptureRequest(), prompter, &summary)
+	_, _, err := collectCapture(context.Background(), interactiveCaptureRequest(), prompter, &summary)
 	if err != nil {
-		t.Fatalf("collectUnifiedCapture() error = %v", err)
+		t.Fatalf("collectCapture() error = %v", err)
 	}
 	want := []capturePromptEvent{
 		{kind: "select", label: "Type", choices: []string{"friction", "action", "follow-up", "decision"}, defaultValue: "friction"},
@@ -140,14 +140,14 @@ func TestCollectUnifiedCaptureFrictionPromptOrderAndDefaults(t *testing.T) {
 	}
 }
 
-func TestCollectUnifiedCaptureDeclineReturnsNoProposal(t *testing.T) {
+func TestCollectCaptureDeclineReturnsNoProposal(t *testing.T) {
 	prompter := &scriptedCapturePrompt{selectValues: []string{"action"}, confirmed: false}
 	var summary bytes.Buffer
-	got, confirmed, err := collectUnifiedCapture(
-		context.Background(), interactiveUnifiedCaptureRequest(), prompter, &summary,
+	got, confirmed, err := collectCapture(
+		context.Background(), interactiveCaptureRequest(), prompter, &summary,
 	)
 	if err != nil {
-		t.Fatalf("collectUnifiedCapture() error = %v", err)
+		t.Fatalf("collectCapture() error = %v", err)
 	}
 	if confirmed || got != (domain.ProposedCapture{}) {
 		t.Errorf("capture/confirmed = %#v/%t, want zero/false", got, confirmed)
@@ -157,7 +157,7 @@ func TestCollectUnifiedCaptureDeclineReturnsNoProposal(t *testing.T) {
 	}
 }
 
-func TestCollectUnifiedCapturePreservesCancellationAndEOFAtEveryStage(t *testing.T) {
+func TestCollectCapturePreservesCancellationAndEOFAtEveryStage(t *testing.T) {
 	for _, promptErr := range []error{prompt.ErrCancelled, prompt.ErrEOF} {
 		for stage := 1; stage <= 7; stage++ {
 			t.Run(promptErr.Error()+" stage "+string(rune('0'+stage)), func(t *testing.T) {
@@ -168,8 +168,8 @@ func TestCollectUnifiedCapturePreservesCancellationAndEOFAtEveryStage(t *testing
 					failAt:       stage,
 					failErr:      promptErr,
 				}
-				got, confirmed, err := collectUnifiedCapture(
-					context.Background(), interactiveUnifiedCaptureRequest(), prompter, io.Discard,
+				got, confirmed, err := collectCapture(
+					context.Background(), interactiveCaptureRequest(), prompter, io.Discard,
 				)
 				if got != (domain.ProposedCapture{}) || confirmed {
 					t.Errorf("capture/confirmed = %#v/%t, want zero/false", got, confirmed)
@@ -188,7 +188,7 @@ func TestCollectUnifiedCapturePreservesCancellationAndEOFAtEveryStage(t *testing
 	}
 }
 
-func TestCollectUnifiedCaptureRejectsInvalidPromptSelections(t *testing.T) {
+func TestCollectCaptureRejectsInvalidPromptSelections(t *testing.T) {
 	tests := []struct {
 		name         string
 		selectValues []string
@@ -203,8 +203,8 @@ func TestCollectUnifiedCaptureRejectsInvalidPromptSelections(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			prompter := &scriptedCapturePrompt{selectValues: tt.selectValues, textValues: tt.textValues, confirmed: true}
-			got, confirmed, err := collectUnifiedCapture(
-				context.Background(), interactiveUnifiedCaptureRequest(), prompter, io.Discard,
+			got, confirmed, err := collectCapture(
+				context.Background(), interactiveCaptureRequest(), prompter, io.Discard,
 			)
 			var invalid *domain.InvalidValueError
 			if !errors.As(err, &invalid) || invalid.Field != tt.wantField {
@@ -222,11 +222,11 @@ func TestCollectUnifiedCaptureRejectsInvalidPromptSelections(t *testing.T) {
 	}
 }
 
-func TestCollectUnifiedCapturePropagatesSummaryWriterFailureBeforeConfirmation(t *testing.T) {
+func TestCollectCapturePropagatesSummaryWriterFailureBeforeConfirmation(t *testing.T) {
 	wantErr := errors.New("writer failed")
 	prompter := &scriptedCapturePrompt{selectValues: []string{"action"}, confirmed: true}
-	got, confirmed, err := collectUnifiedCapture(
-		context.Background(), interactiveUnifiedCaptureRequest(), prompter, failingCaptureWriter{err: wantErr},
+	got, confirmed, err := collectCapture(
+		context.Background(), interactiveCaptureRequest(), prompter, failingCaptureWriter{err: wantErr},
 	)
 	if !errors.Is(err, wantErr) || got != (domain.ProposedCapture{}) || confirmed {
 		t.Fatalf("capture/confirmed/error = %#v/%t/%v", got, confirmed, err)
@@ -238,25 +238,25 @@ func TestCollectUnifiedCapturePropagatesSummaryWriterFailureBeforeConfirmation(t
 	}
 }
 
-func TestCollectUnifiedCaptureRejectsNonInteractiveRequestAndMissingBoundaries(t *testing.T) {
-	quick, err := parseUnifiedCaptureRequest([]string{"--quick", "--type", "action", "description"})
+func TestCollectCaptureRejectsNonInteractiveRequestAndMissingBoundaries(t *testing.T) {
+	quick, err := parseCaptureRequest([]string{"--quick", "--type", "action", "description"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	tests := []struct {
 		name      string
-		request   unifiedCaptureRequest
+		request   captureRequest
 		prompter  Prompt
 		writer    io.Writer
 		wantError string
 	}{
 		{name: "quick request", request: quick, prompter: &scriptedCapturePrompt{}, writer: io.Discard, wantError: "interactive capture request is required"},
-		{name: "missing prompt", request: interactiveUnifiedCaptureRequest(), writer: io.Discard, wantError: "capture prompt is required"},
-		{name: "missing writer", request: interactiveUnifiedCaptureRequest(), prompter: &scriptedCapturePrompt{}, wantError: "capture summary writer is required"},
+		{name: "missing prompt", request: interactiveCaptureRequest(), writer: io.Discard, wantError: "capture prompt is required"},
+		{name: "missing writer", request: interactiveCaptureRequest(), prompter: &scriptedCapturePrompt{}, wantError: "capture summary writer is required"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, err := collectUnifiedCapture(context.Background(), tt.request, tt.prompter, tt.writer)
+			_, _, err := collectCapture(context.Background(), tt.request, tt.prompter, tt.writer)
 			if err == nil || err.Error() != tt.wantError {
 				t.Fatalf("error = %v, want %q", err, tt.wantError)
 			}
@@ -264,10 +264,10 @@ func TestCollectUnifiedCaptureRejectsNonInteractiveRequestAndMissingBoundaries(t
 	}
 }
 
-func TestCollectUnifiedCaptureValidatesDescriptionBeforePrompting(t *testing.T) {
+func TestCollectCaptureValidatesDescriptionBeforePrompting(t *testing.T) {
 	prompter := &scriptedCapturePrompt{}
-	_, confirmed, err := collectUnifiedCapture(
-		context.Background(), unifiedCaptureRequest{description: "   "}, prompter, io.Discard,
+	_, confirmed, err := collectCapture(
+		context.Background(), captureRequest{description: "   "}, prompter, io.Discard,
 	)
 	var validation *domain.InvalidValueError
 	if !errors.As(err, &validation) {
@@ -281,8 +281,8 @@ func TestCollectUnifiedCaptureValidatesDescriptionBeforePrompting(t *testing.T) 
 	}
 }
 
-func interactiveUnifiedCaptureRequest() unifiedCaptureRequest {
-	return unifiedCaptureRequest{description: "description"}
+func interactiveCaptureRequest() captureRequest {
+	return captureRequest{description: "description"}
 }
 
 type failingCaptureWriter struct{ err error }

@@ -10,11 +10,11 @@ import (
 	"github.com/damienomurchu/forge-cli/internal/output"
 )
 
-// collectUnifiedCapture collects and confirms an interactive capture without
+// collectCapture collects and confirms an interactive capture without
 // generating persistence metadata or accessing storage.
-func collectUnifiedCapture(
+func collectCapture(
 	ctx context.Context,
-	request unifiedCaptureRequest,
+	request captureRequest,
 	prompter Prompt,
 	summaryWriter io.Writer,
 ) (domain.ProposedCapture, bool, error) {

@@ -150,7 +150,7 @@ func runCapture(ctx context.Context, args []string, rt Runtime) error {
 		_, err := io.WriteString(rt.Stdout, captureHelp)
 		return err
 	}
-	request, err := parseUnifiedCaptureRequest(args)
+	request, err := parseCaptureRequest(args)
 	if err != nil {
 		return err
 	}
@@ -172,7 +172,7 @@ func runCapture(ctx context.Context, args []string, rt Runtime) error {
 			return errors.New("capture summary writer is not configured")
 		}
 		var confirmed bool
-		proposed, confirmed, err = collectUnifiedCapture(ctx, request, prompter, rt.Stderr)
+		proposed, confirmed, err = collectCapture(ctx, request, prompter, rt.Stderr)
 		if err != nil {
 			return err
 		}
@@ -194,18 +194,12 @@ func runCapture(ctx context.Context, args []string, rt Runtime) error {
 		return errors.Join(err, session.Close())
 	}
 	var rendered bytes.Buffer
-	if _, err := persistUnifiedCapture(
+	if _, err := persistCapture(
 		ctx, proposed, request.json, rt.Now(), rt.Random, repo, &rendered,
 	); err != nil {
 		return errors.Join(err, session.Close())
 	}
-	if err := session.Close(); err != nil {
-		return fmt.Errorf("close storage after capture: %w", err)
-	}
-	if _, err := io.Copy(rt.Stdout, &rendered); err != nil {
-		return fmt.Errorf("write capture result: %w", err)
-	}
-	return nil
+	return closeAndPublish(session, &rendered, rt.Stdout, "capture")
 }
 
 func runList(ctx context.Context, args []string, rt Runtime) error {
@@ -213,7 +207,7 @@ func runList(ctx context.Context, args []string, rt Runtime) error {
 		_, err := io.WriteString(rt.Stdout, listHelp)
 		return err
 	}
-	request, err := parseUnifiedListRequest(args)
+	request, err := parseListRequest(args)
 	if err != nil {
 		return err
 	}
@@ -232,10 +226,7 @@ func runList(ctx context.Context, args []string, rt Runtime) error {
 		if err != nil {
 			return fmt.Errorf("render list result: %w", err)
 		}
-		if _, err := io.Copy(rt.Stdout, &rendered); err != nil {
-			return fmt.Errorf("write list result: %w", err)
-		}
-		return nil
+		return publish(&rendered, rt.Stdout, "list")
 	}
 	if err != nil {
 		return fmt.Errorf("open storage for list: %w", err)
@@ -245,16 +236,10 @@ func runList(ctx context.Context, args []string, rt Runtime) error {
 		return errors.Join(err, session.Close())
 	}
 	var rendered bytes.Buffer
-	if err := executeUnifiedList(ctx, request, repo, &rendered); err != nil {
+	if err := executeList(ctx, request, repo, &rendered); err != nil {
 		return errors.Join(err, session.Close())
 	}
-	if err := session.Close(); err != nil {
-		return fmt.Errorf("close storage after list: %w", err)
-	}
-	if _, err := io.Copy(rt.Stdout, &rendered); err != nil {
-		return fmt.Errorf("write list result: %w", err)
-	}
-	return nil
+	return closeAndPublish(session, &rendered, rt.Stdout, "list")
 }
 
 func runShow(ctx context.Context, args []string, rt Runtime) error {
@@ -282,29 +267,26 @@ func runShow(ctx context.Context, args []string, rt Runtime) error {
 		return errors.Join(err, session.Close())
 	}
 	var rendered bytes.Buffer
-	err = executeUnifiedShow(ctx, id, jsonOutput, repo, &rendered)
+	err = executeShow(ctx, id, jsonOutput, repo, &rendered)
 	if errors.Is(err, repository.ErrRecordNotFound) {
 		return errors.Join(fmt.Errorf("record %q not found", id.String()), session.Close())
 	}
 	if err != nil {
 		return errors.Join(err, session.Close())
 	}
-	if err := session.Close(); err != nil {
-		return fmt.Errorf("close storage after show: %w", err)
-	}
-	if _, err := io.Copy(rt.Stdout, &rendered); err != nil {
-		return fmt.Errorf("write show result: %w", err)
-	}
-	return nil
+	return closeAndPublish(session, &rendered, rt.Stdout, "show")
 }
 
 func parseShow(args []string) (domain.ID, bool, error) {
 	var id domain.ID
-	idSet, jsonOutput := false, false
+	idSet, jsonOutput, jsonSet := false, false, false
 	for _, argument := range args {
 		switch {
 		case argument == "--json":
-			jsonOutput = true
+			if jsonSet {
+				return "", false, &UsageError{Message: "--json may only be specified once"}
+			}
+			jsonOutput, jsonSet = true, true
 		case strings.HasPrefix(argument, "-"):
 			return "", false, &UsageError{Argument: argument}
 		case idSet:
@@ -320,6 +302,22 @@ func parseShow(args []string) (domain.ID, bool, error) {
 		return "", false, err
 	}
 	return id, jsonOutput, nil
+}
+
+// closeAndPublish ensures a successful command result is not exposed until its
+// storage session has closed successfully.
+func closeAndPublish(session *storage.Session, rendered *bytes.Buffer, stdout io.Writer, command string) error {
+	if err := session.Close(); err != nil {
+		return fmt.Errorf("close storage after %s: %w", command, err)
+	}
+	return publish(rendered, stdout, command)
+}
+
+func publish(rendered *bytes.Buffer, stdout io.Writer, command string) error {
+	if _, err := io.Copy(stdout, rendered); err != nil {
+		return fmt.Errorf("write %s result: %w", command, err)
+	}
+	return nil
 }
 
 func validateLookupID(id domain.ID) error {
