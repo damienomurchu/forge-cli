@@ -26,6 +26,9 @@ var migrationFiles = []struct {
 	name    string
 }{
 	{version: 1, name: "001_initial.sql"},
+	// Migration 002 is embedded and tested but remains inactive until the
+	// unified repository and command cutover raises LatestSchemaVersion.
+	{version: 2, name: "002_unified_captures.sql"},
 }
 
 // SchemaState describes whether an open database requires a migration.
@@ -71,6 +74,9 @@ func ApplyMigrations(ctx context.Context, db *sql.DB) error {
 	}
 
 	for _, file := range migrationFiles {
+		if file.version > LatestSchemaVersion {
+			break
+		}
 		if file.version <= state.Version {
 			continue
 		}

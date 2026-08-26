@@ -77,17 +77,27 @@ follow-up, and decision require no placeholder columns.
 
 ## Migration 002
 
+Implementation status: `002_unified_captures.sql` is embedded, registered, and
+tested directly, but `LatestSchemaVersion` intentionally remains `1`. Activating
+version 2 before the unified repository and command cutover would make current
+migration-001 queries incompatible with newly opened databases. Raise the active
+version to `2` as part of that cutover; the migration runner explicitly skips
+registered migrations newer than the active version.
+
 Migration 002 must run in one transaction and:
 
 1. verify migration 001 is the expected Go-owned schema;
 2. verify there are no legacy `type = 'capture'` rows or `record_tags` rows;
-3. create the target table and indexes;
-4. copy every legacy `type = 'friction'` row as `capture_type = 'friction'`;
-5. map project, classification, workaround, ID, description, and timestamps
+3. reject friction outside `captured`, whose old lifecycle state has no lossless
+   representation in the reset model;
+4. create the target table and indexes;
+5. copy every representable legacy `type = 'friction'` row as
+   `capture_type = 'friction'`;
+6. map project, classification, workaround, ID, description, and timestamps
    without loss;
-6. remove superseded tables, triggers, and indexes;
-7. install final target names; and
-8. record migration 002 only after every step succeeds.
+7. remove superseded tables, triggers, and indexes;
+8. install final target names; and
+9. record migration 002 only after every step succeeds.
 
 The current known development database contains no records, but implementation and
 tests must not depend on that fact. Existing friction records are preserved. If an
