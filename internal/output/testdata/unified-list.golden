@@ -1,0 +1,4 @@
+cap_00000000000000000000000000000000  decision  Choose the database
+frc_00000000000000000000000000000000  friction  Releases require manual checks
+cap_00000000000000000000000000000000  action  Ship the release
+cap_00000000000000000000000000000000  follow-up  Chase the vendor
