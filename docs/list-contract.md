@@ -30,3 +30,9 @@ capture with no heading:
 An empty human result writes nothing. JSON emits a complete record array followed
 by a newline, including `[]` when empty. Listing is strictly read-only and never
 initializes or migrates missing storage.
+
+Implementation status: the target parser is implemented and tested as the
+currently undispatched `parseUnifiedListRequest` boundary. It produces unified
+repository filters, recognizes only the four capture types, normalizes project
+values, validates positive limits, and rejects the removed universal status
+filter. Keep it undispatched until the coordinated schema-2 command cutover.
