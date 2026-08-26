@@ -9,6 +9,7 @@ lost. Captures are stored locally in SQLite and have one of four types:
 ```text
 forge capture DESCRIPTION
 forge capture --quick --type TYPE DESCRIPTION
+forge completion SHELL
 forge list [--limit N] [--type TYPE] [--project PROJECT] [--json]
 forge show [--json] RECORD_ID
 ```
@@ -25,6 +26,21 @@ Type-aware review workflows are planned but not yet specified or implemented.
 
 Run `forge --help` or `forge <command> --help` for complete command usage.
 
+## Shell completion
+
+Generate a completion script for Bash, Fish, or Zsh:
+
+```sh
+forge completion bash
+forge completion fish
+forge completion zsh
+```
+
+Source the output from your shell startup file or save it in that shell's
+completion directory. Repository contributors can run `just completions` to write
+all three scripts under `completions/`, or `just completion-check` to generate and
+syntax-check them using the locally installed shells.
+
 ## Development
 
 The project requires the Go version pinned in `mise.toml` and uses
@@ -33,6 +49,7 @@ The project requires the Go version pinned in `mise.toml` and uses
 ```sh
 just build            # build bin/forge
 just test             # run the test suite
+just completion-check # syntax-check generated shell completions
 just check            # formatting, modules, vet, tests, race, coverage, vulnerabilities
 just ci               # checks plus cross-builds and benchmark harness tests
 ```

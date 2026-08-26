@@ -6,6 +6,7 @@ Usage:
 
 Commands:
   capture    Capture friction, an action, a follow-up, or a decision
+  completion Generate shell completion scripts
   list       List captures
   show       Show a capture
 

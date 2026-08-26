@@ -26,6 +26,7 @@ func TestCommandHelpMatchesGoldenFiles(t *testing.T) {
 	}{
 		{name: "top level", args: nil, file: "help.golden"},
 		{name: "capture", args: []string{"capture", "--help"}, file: "capture-help.golden"},
+		{name: "completion", args: []string{"completion", "--help"}, file: "completion-help.golden"},
 		{name: "list", args: []string{"list", "--help"}, file: "list-help.golden"},
 		{name: "show", args: []string{"show", "--help"}, file: "show-help.golden"},
 	}

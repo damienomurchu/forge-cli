@@ -10,6 +10,7 @@ forge
 forge --help
 forge --version
 forge capture [capture options] DESCRIPTION
+forge completion SHELL
 forge list [--limit N] [--type TYPE] [--project PROJECT] [--json]
 forge show [--json] RECORD_ID
 ```
@@ -29,6 +30,16 @@ Release builds inject the version; development builds use `dev`.
 
 Help, version, and command lines rejected during parsing do not inspect, create, or
 modify Forge storage.
+
+## Completion
+
+`forge completion bash`, `forge completion fish`, and `forge completion zsh` emit
+a sourceable completion script for the selected shell. The script is the only
+stdout output and ends with a newline. Completion generation does not inspect or
+create storage.
+
+A missing shell, unsupported shell, extra positional argument, or unknown flag is
+a usage error. `-h` and `--help` print command help without requiring a shell.
 
 ## Output streams
 

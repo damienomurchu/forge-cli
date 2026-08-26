@@ -1,0 +1,12 @@
+Generate a shell completion script.
+
+Usage:
+  forge completion SHELL
+
+Supported shells:
+  bash
+  fish
+  zsh
+
+Flags:
+  -h, --help  Show help

@@ -27,6 +27,7 @@ Usage:
 
 Commands:
   capture    Capture friction, an action, a follow-up, or a decision
+  completion Generate shell completion scripts
   list       List captures
   show       Show a capture
 
@@ -79,6 +80,20 @@ Usage:
 Flags:
   -h, --help  Show help
       --json   Write the record as JSON
+`
+
+const completionHelp = `Generate a shell completion script.
+
+Usage:
+  forge completion SHELL
+
+Supported shells:
+  bash
+  fish
+  zsh
+
+Flags:
+  -h, --help  Show help
 `
 
 // Runtime contains process facilities used by the CLI.
@@ -136,6 +151,8 @@ func Run(ctx context.Context, args []string, rt Runtime, version string) error {
 		return err
 	case args[0] == "capture":
 		return runCapture(ctx, args[1:], rt)
+	case args[0] == "completion":
+		return runCompletion(args[1:], rt)
 	case args[0] == "list":
 		return runList(ctx, args[1:], rt)
 	case args[0] == "show":

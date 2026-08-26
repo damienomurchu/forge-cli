@@ -64,7 +64,24 @@ cross-build:
 check: fmt-check mod-check vet test test-race test-cover vuln
 
 # Run all checks expected in CI.
-ci: check cross-build benchmark-test
+ci: check cross-build benchmark-test completion-check
+
+# Generate completion scripts (usage: just completions [OUTPUT_DIR]).
+completions output_dir="completions": build
+    mkdir -p "{{output_dir}}"
+    ./bin/forge completion bash > "{{output_dir}}/forge.bash"
+    ./bin/forge completion fish > "{{output_dir}}/forge.fish"
+    ./bin/forge completion zsh > "{{output_dir}}/_forge"
+
+# Generate and syntax-check completion scripts with installed shells.
+completion-check: build
+    completion_dir="$(mktemp -d)"; trap 'rm -rf "$completion_dir"' EXIT; \
+      ./bin/forge completion bash > "$completion_dir/forge.bash"; \
+      ./bin/forge completion fish > "$completion_dir/forge.fish"; \
+      ./bin/forge completion zsh > "$completion_dir/_forge"; \
+      bash -n "$completion_dir/forge.bash"; \
+      if command -v fish >/dev/null; then fish -n "$completion_dir/forge.fish"; fi; \
+      if command -v zsh >/dev/null; then zsh -n "$completion_dir/_forge"; fi
 
 # Test the benchmark harness without Forge or hyperfine.
 benchmark-test:
