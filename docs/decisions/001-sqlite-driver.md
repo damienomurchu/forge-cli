@@ -26,6 +26,11 @@ The driver remains replaceable at the repository boundary. Revisit this decision
 if production CLI measurements miss their budgets, binary size becomes a release
 constraint, or maintenance and vulnerability signals deteriorate.
 
+The unified-capture redesign does not change this driver decision. The schema and
+query evidence below describes migration 001 and is historical evidence for the
+driver, not the active product model. Migration 002 and the target schema are
+defined in `docs/storage-contract.md`.
+
 ## Evidence
 
 The disposable spike in `spikes/sqlite` executes the checked-in

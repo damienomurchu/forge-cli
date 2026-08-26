@@ -1,45 +1,32 @@
 # List Command Contract
 
-This document defines the initial product behavior of the top-level record list.
-
 ## Synopsis
 
 ```text
-forge list [--limit N] [--type TYPE] [--project PROJECT] [--status STATUS]
-           [--json]
+forge list [--limit N] [--type TYPE] [--project PROJECT] [--json]
 ```
 
-`forge list` replaces type-specific nested commands such as `forge capture list`
-and `forge friction list`. Those nested forms are not aliases.
+With no filters, list returns every capture. Filters combine with AND semantics:
 
-## Filters
+- `--type` accepts `friction`, `action`, `follow-up`, or `decision`;
+- `--project` matches normalized friction project values and therefore only
+  returns friction captures;
+- `--limit` is positive and applies after filtering and ordering.
 
-With no filters, the command returns records of every type. Filters combine with
-AND semantics:
+There is no universal `--status` filter. Lifecycle filtering will be designed with
+type-specific review contracts.
 
-- `--type` accepts `capture` or `friction`.
-- `--project` matches the normalized project value.
-- `--status` accepts an approved record status.
-- `--limit` accepts a positive integer and restricts the number of returned
-  records after filtering and ordering.
+Unknown flags, positional arguments, and missing flag values are usage errors.
+Invalid types, empty project filters, and non-positive limits are validation
+failures.
 
-Unknown flags, positional arguments, and missing flag values are usage errors with
-exit status `2`. Invalid types or statuses, empty project filters, and non-positive
-limits are validation failures with exit status `1`.
-
-## Ordering and output
-
-Results are ordered newest first with a deterministic tie-breaker. Human mode emits
-one terminal-safe line per record, with fields separated by two spaces:
+Results use `created_at DESC, id DESC`. Human mode emits one terminal-safe line per
+capture with no heading:
 
 ```text
-<id>  <type>  <status>  <description>
+<id>  <capture-type>  <description>
 ```
 
-It has no heading. An empty result succeeds and writes nothing. This initial layout
-is fixed by implementation goldens.
-
-With `--json`, the command emits one array followed by a newline, including `[]`
-when no records match. It emits no human commentary on stdout.
-
-Listing is read-only. A successful list does not alter records or database state.
+An empty human result writes nothing. JSON emits a complete record array followed
+by a newline, including `[]` when empty. Listing is strictly read-only and never
+initializes or migrates missing storage.

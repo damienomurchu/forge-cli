@@ -1,123 +1,69 @@
 # Forge CLI Contract
 
-This document defines the initial public behavior of Forge's command-line shell.
-It is an intentional contract for the Go project, not a record of behavior from the
-archived Python implementation.
+This document defines Forge's active command-line shell. It supersedes the earlier
+separate `capture` and `friction` command design.
 
-## Top-level invocation
-
-Running `forge` without arguments prints the complete top-level help to stdout and
-exits successfully.
+## Command surface
 
 ```text
 forge
-forge -h
 forge --help
+forge --version
+forge capture [capture options] DESCRIPTION
+forge list [--limit N] [--type TYPE] [--project PROJECT] [--json]
+forge show RECORD_ID [--json]
 ```
 
-All three invocations print the same top-level help and exit with status `0`.
+The intended `forge review <type>` family is reserved but not yet specified or
+implemented. There is no top-level `forge friction` command and no generic
+`forge update` command. They must not appear in help as available commands.
 
-## Command help
+## Help and version
 
-Every command and subcommand supports both `-h` and `--help`. Help may appear after
-the command name or subcommand name and exits with status `0`.
+Running `forge`, `forge -h`, or `forge --help` prints the same complete top-level
+help to stdout and exits `0`. Every active command supports `-h` and `--help`.
+Requested help takes precedence over missing positional arguments and flags.
 
-Help is written to stdout. Requesting help takes precedence over requirements for
-the command's positional arguments and flags.
+`forge --version` prints `forge <version>` followed by a newline and exits `0`.
+Release builds inject the version; development builds use `dev`.
 
-## Version
-
-`forge --version` writes the version to stdout in this form and exits with status
-`0`:
-
-```text
-forge <version>
-```
-
-For example:
-
-```text
-forge 0.1.0
-```
-
-Release builds inject the version at link time. Development builds use the
-deterministic fallback `dev`.
+Help, version, and command lines rejected during parsing do not inspect, create, or
+modify Forge storage.
 
 ## Output streams
 
-- Requested help and version output go to stdout.
-- Normal command results go to stdout.
-- Usage mistakes, validation failures, and operational errors go to stderr.
-- An error must not duplicate its message across stdout and stderr.
+- Help, version, and normal command results go to stdout.
+- Usage, validation, and operational errors go to stderr.
+- An error is not duplicated across streams.
+- Prompt rendering goes to the prompt stream, never JSON stdout.
 
 ## Terminal-safe human text
 
-Human-readable output never writes untrusted terminal controls or Unicode
-bidirectional controls literally. Forge preserves ordinary printable Unicode and
-uses these visible escapes:
-
-- newline, carriage return, and tab become `\n`, `\r`, and `\t`;
-- a literal backslash becomes `\\` so escapes remain unambiguous;
-- byte-range controls and invalid UTF-8 bytes use lowercase `\xhh`;
-- other non-graphic Unicode and bidirectional controls use lowercase `\uhhhh` or
-  `\Uhhhhhhhh` according to code-point width.
-
-This escaping applies to human presentation. JSON mode continues to use valid JSON
-string encoding.
+Human output never writes untrusted terminal controls or Unicode bidirectional
+controls literally. Newline, carriage return, tab, and backslash use visible
+escapes; byte controls and invalid UTF-8 use lowercase `\xhh`; other non-graphic
+Unicode and bidirectional controls use lowercase `\uhhhh` or `\Uhhhhhhhh`.
 
 ## JSON output
 
-JSON is an explicit machine-readable mode enabled with `--json` on commands that
-support it. Commands use human-readable output by default.
+- A capture or show result emits one complete record object.
+- List emits one array, including `[]` when empty.
+- JSON stdout contains only the value followed by a newline.
+- Errors remain concise text on stderr and emit no JSON.
 
-- A successful command that returns one record emits one JSON object.
-- A successful list or review command emits one JSON array, including `[]` when no
-  records match.
-- JSON stdout contains only the requested JSON value: no styling, progress,
-  confirmation, labels, or other human commentary.
-- Errors are concise text on stderr and produce no JSON on stdout. Structured JSON
-  errors are not part of the initial interface.
-- Successful JSON output is terminated by a newline.
-
-Field names and JSON value types become public API when they are included in a
-released version. Minor releases may add optional fields. Removing or renaming a
-field, changing its type, or changing the top-level object/array shape requires a
-major-version decision and release. Record fields and types are defined in
-`docs/record-contract.md`.
+Schemas are defined in `docs/record-contract.md`. Adding an optional field is a
+minor-version decision. Removing or renaming a field, changing its type, or
+changing a top-level shape requires a major-version decision.
 
 ## Exit statuses
 
-Forge uses these initial exit-status categories:
-
 | Status | Meaning |
 |---:|---|
-| `0` | Success, including requested help or version output |
+| `0` | Success, including help, version, or declined confirmation |
 | `1` | Operational or validation failure |
 | `2` | Invalid command-line usage |
 | `130` | Interrupted by the user |
 
-A validation failure means that the command was understood but its requested value
-or operation is invalid. A usage failure means that the command line could not be
-parsed into a valid command, such as an unknown command, unknown flag, or missing
-flag value.
-
-## Filesystem isolation
-
-The following paths complete without inspecting, creating, or modifying Forge
-configuration, data directories, or databases:
-
-- `forge`
-- `forge -h`
-- `forge --help`
-- `forge --version`
-- command and subcommand help
-- command lines rejected during argument parsing
-
-This guarantee keeps startup paths fast and ensures that asking for guidance or
-making a typing mistake has no persistent side effects.
-
-## Stability
-
-The behaviors in this document are the contract for the first Go implementation.
-Exact help wording and layout are protected by intentional golden tests. They are
-not derived from Python 2.1.0.
+Unknown commands and flags, extra positionals, missing required positionals, and
+missing flag values are usage errors. An understood command with an invalid domain
+value is a validation failure.

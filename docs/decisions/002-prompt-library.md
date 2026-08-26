@@ -30,8 +30,10 @@ The adapter must:
 - validate choices and defaults before starting terminal UI
 - avoid accessible mode's error-swallowing input loop
 
-The library remains replaceable behind the interface. Quick paths and commands with
-all required values do not construct a form.
+The library remains replaceable behind the interface. Quick paths do not construct
+a form. In the unified-capture design, interactive capture always uses the adapter
+for type selection and confirmation, plus friction-specific fields when friction
+is selected.
 
 ## Evidence
 
@@ -88,9 +90,10 @@ hanging.
 
 The library's accessible mode provides useful numbered and line-oriented prompts,
 but its input helpers do not return scanner EOF or cancellation errors to the form.
-Forge will not enable that mode unchanged. Phase 6 must provide a Forge-owned plain
-line fallback with explicit EOF/cancellation handling or document a clear terminal
-capability error; accessible mode is not silently assumed to be safe.
+Forge will not enable that mode unchanged. A later accessibility slice must provide
+a Forge-owned plain line fallback with explicit EOF/cancellation handling or
+document a clear terminal capability error; accessible mode is not silently
+assumed to be safe.
 
 The styling stack issues terminal capability queries before rendering. Real
 terminals answer them, and the PTY suite must emulate them to avoid false hangs.

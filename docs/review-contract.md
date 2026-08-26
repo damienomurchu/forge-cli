@@ -1,54 +1,39 @@
-# Review Command Contract
+# Review Command Design Boundary
 
-This document defines the initial product behavior of `forge review` for the Go
-implementation.
+Review is intentionally deferred pending updated product requirements.
 
-## Synopsis
-
-```text
-forge review [--json]
-```
-
-`review` is a focused view of actionable friction. It takes no positional
-arguments. An extra argument, including the historical `friction` qualifier, an
-unknown flag, or a value supplied to `--json` is a usage error with exit status
-`2`.
-
-## Included records
-
-The command includes records whose type is `friction` and whose status is one of:
+## Reserved surface
 
 ```text
-captured
-reviewing
-candidate
+forge review friction
+forge review action
+forge review follow-up
+forge review decision
 ```
 
-It excludes capture records and friction with `automated` or `dismissed` status.
-Results are ordered newest first with the same deterministic tie-breaker used by
-`forge list`.
+Review must be type-aware and support meaningful next transitions rather than
+merely displaying a filtered list. A universal status model is prohibited unless
+later requirements demonstrate genuinely shared semantics.
 
-This initial command intentionally has no filters or limit. `forge list` provides
-general-purpose querying. Review-specific options should be introduced only when a
-clear review workflow needs them.
+Potential workflow language is context, not a contract:
 
-## Results
+- action: execute, defer, delegate, complete
+- follow-up: wait, chase, escalate, update, close
+- decision: clarify, record outcome and rationale, revisit, validate, reverse
+- friction: requirements to be supplied later
 
-Human mode writes a review-oriented presentation to stdout. It succeeds when no
-records match and displays a concise empty state rather than treating that case as
-an error. Exact populated and empty layouts will be approved with implementation
-golden tests.
+## Not yet decided
 
-With `--json`, success emits one array followed by a newline, including `[]` when no
-records match. The array contains complete friction record objects and obeys the
-stability and stream rules in `docs/cli-contract.md`.
+Do not implement, persist, or expose assumptions about:
 
-Database, filesystem, and stored-data failures emit nothing to stdout, write a
-concise error to stderr, and exit `1`.
+- lifecycle states or transition graphs;
+- which records are actionable;
+- review ordering, batching, or filtering;
+- interactive versus non-interactive transition syntax;
+- timestamps, assignees, deadlines, rationale, or outcome fields;
+- JSON schemas for review results;
+- whether a transition completes review or schedules another review.
 
-## Read-only guarantee
-
-`forge review` is strictly read-only. It does not change status, timestamps,
-type-specific details, migrations, or other application state. Filtering and
-ordering occur in the repository query rather than by loading and discarding
-unrelated records in the application layer.
+Until these decisions are approved, top-level help may describe review as planned
+but must not present it as an available implemented workflow. General read-only
+inspection remains available through `forge list` and `forge show`.

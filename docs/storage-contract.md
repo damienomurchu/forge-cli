@@ -1,47 +1,25 @@
 # SQLite Storage Contract
 
-This document defines the initial persistence model for the Go implementation.
-SQLite storage follows the product model in `docs/record-contract.md`; it is not a
-continuation of the archived Python database schema.
+This document defines the target persistence model for the unified capture design.
+Migration 001 remains immutable history. Migration 002 performs the model reset.
 
-## Decision
+## Target model
 
-Forge uses one `records` table with typed nullable columns for type-specific data
-and one normalized `record_tags` table for ordered capture tags. It does not store
-type-specific fields in opaque metadata JSON.
+Forge uses one `records` table. Every row is a capture and `capture_type`
+discriminates explicit typed columns. Opaque metadata JSON is not used.
 
-This design keeps the shared list and review queries simple, allows SQLite to
-validate domain values, preserves tag order without encoding arrays into text, and
-makes future migrations explicit. Nullable type-specific columns are acceptable
-because a table constraint enforces the valid column set for each record type.
-
-## Migration 001
-
-The first migration creates the following schema. The checked-in SQL migration is
-the executable source of truth once implementation begins; this contract must stay
-synchronized with it.
+The target schema is equivalent to:
 
 ```sql
-CREATE TABLE schema_migrations (
-    version INTEGER PRIMARY KEY,
-    name TEXT NOT NULL UNIQUE,
-    applied_at TEXT NOT NULL
-);
-
-CREATE TABLE records (
+CREATE TABLE records_v2 (
     id TEXT PRIMARY KEY,
-    type TEXT NOT NULL CHECK (type IN ('capture', 'friction')),
+    capture_type TEXT NOT NULL CHECK (
+        capture_type IN ('friction', 'action', 'follow-up', 'decision')
+    ),
     description TEXT NOT NULL CHECK (length(description) > 0),
-    project TEXT CHECK (
-        project IS NULL OR (length(project) > 0 AND project = trim(project))
-    ),
-    status TEXT NOT NULL CHECK (
-        status IN ('captured', 'reviewing', 'candidate', 'automated', 'dismissed')
-    ),
-
-    capture_kind TEXT CHECK (
-        capture_kind IS NULL OR capture_kind IN (
-            'thought', 'idea', 'observation', 'question', 'decision', 'seed'
+    friction_project TEXT CHECK (
+        friction_project IS NULL OR (
+            length(friction_project) > 0 AND friction_project = trim(friction_project)
         )
     ),
     friction_frequency TEXT CHECK (
@@ -50,9 +28,7 @@ CREATE TABLE records (
         )
     ),
     friction_impact TEXT CHECK (
-        friction_impact IS NULL OR friction_impact IN (
-            'low', 'medium', 'high', 'unknown'
-        )
+        friction_impact IS NULL OR friction_impact IN ('low', 'medium', 'high', 'unknown')
     ),
     friction_category TEXT CHECK (
         friction_category IS NULL OR friction_category IN (
@@ -60,228 +36,113 @@ CREATE TABLE records (
             'remembering', 'verification', 'waiting', 'other'
         )
     ),
-    current_workaround TEXT CHECK (
-        current_workaround IS NULL OR (
-            length(current_workaround) > 0
-            AND current_workaround = trim(current_workaround)
+    friction_current_workaround TEXT CHECK (
+        friction_current_workaround IS NULL OR (
+            length(friction_current_workaround) > 0
+            AND friction_current_workaround = trim(friction_current_workaround)
         )
     ),
-
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-
     CHECK (
-        (type = 'capture'
-            AND capture_kind IS NOT NULL
-            AND friction_frequency IS NULL
-            AND friction_impact IS NULL
-            AND friction_category IS NULL
-            AND current_workaround IS NULL)
-        OR
-        (type = 'friction'
-            AND capture_kind IS NULL
+        (capture_type = 'friction'
             AND friction_frequency IS NOT NULL
             AND friction_impact IS NOT NULL
             AND friction_category IS NOT NULL)
-    ),
-    CHECK (
-        (type = 'capture'
-            AND length(id) = 36
-            AND substr(id, 1, 4) = 'cap_'
-            AND substr(id, 5) NOT GLOB '*[^0-9a-f]*')
         OR
-        (type = 'friction'
-            AND length(id) = 36
-            AND substr(id, 1, 4) = 'frc_'
-            AND substr(id, 5) NOT GLOB '*[^0-9a-f]*')
+        (capture_type IN ('action', 'follow-up', 'decision')
+            AND friction_project IS NULL
+            AND friction_frequency IS NULL
+            AND friction_impact IS NULL
+            AND friction_category IS NULL
+            AND friction_current_workaround IS NULL)
     )
 );
 
-CREATE TABLE record_tags (
-    record_id TEXT NOT NULL REFERENCES records(id) ON DELETE CASCADE,
-    position INTEGER NOT NULL CHECK (position >= 0),
-    tag TEXT NOT NULL CHECK (
-        length(tag) > 0 AND tag = trim(tag) AND tag = lower(tag)
-    ),
-    PRIMARY KEY (record_id, position),
-    UNIQUE (record_id, tag)
-);
-
-CREATE TRIGGER records_type_immutable
-BEFORE UPDATE OF type ON records
-WHEN NEW.type <> OLD.type
-BEGIN
-    SELECT RAISE(ABORT, 'record type is immutable');
-END;
-
-CREATE TRIGGER record_tags_capture_only_insert
-BEFORE INSERT ON record_tags
-WHEN NOT EXISTS (
-    SELECT 1 FROM records WHERE id = NEW.record_id AND type = 'capture'
-)
-BEGIN
-    SELECT RAISE(ABORT, 'tags require a capture record');
-END;
-
-CREATE TRIGGER record_tags_capture_only_update
-BEFORE UPDATE OF record_id ON record_tags
-WHEN NOT EXISTS (
-    SELECT 1 FROM records WHERE id = NEW.record_id AND type = 'capture'
-)
-BEGIN
-    SELECT RAISE(ABORT, 'tags require a capture record');
-END;
-
-CREATE INDEX idx_records_created
-    ON records(created_at DESC, id DESC);
-CREATE INDEX idx_records_type_created
-    ON records(type, created_at DESC, id DESC);
-CREATE INDEX idx_records_status_created
-    ON records(status, created_at DESC, id DESC);
-CREATE INDEX idx_records_project_created
-    ON records(project, created_at DESC, id DESC);
+CREATE INDEX idx_records_v2_created
+    ON records_v2(created_at DESC, id DESC);
+CREATE INDEX idx_records_v2_type_created
+    ON records_v2(capture_type, created_at DESC, id DESC);
+CREATE INDEX idx_records_v2_friction_project_created
+    ON records_v2(friction_project, created_at DESC, id DESC);
 ```
 
-Go domain validation remains responsible for full Unicode whitespace and case
-normalization and exact timestamp parsing. Database constraints provide defense in
-depth and protect the finite vocabulary and type-specific shape.
+The checked-in migration SQL becomes the executable source of truth. It may use a
+temporary table and final names appropriate to SQLite rebuilding; this contract
+must remain synchronized with it.
 
-## Tags
+No universal status column or lifecycle table is added. Future review contracts
+will define type-specific state and migrations. Empty details for action,
+follow-up, and decision require no placeholder columns.
 
-Tag positions are contiguous zero-based integers assigned after normalization.
-Queries load tags ordered by `position ASC`. Creating a capture inserts its record
-and all tags in one transaction. Friction records can never have tag rows.
+## Migration 002
 
-## Migrations
+Migration 002 must run in one transaction and:
 
-- Migration files use zero-padded numeric versions, beginning with
-  `001_initial.sql`.
-- Apply pending migrations in numeric order inside transactions.
-- Insert the `schema_migrations` row only after that migration's statements
-  succeed.
-- A failed migration rolls back completely and preserves the prior database.
-- An unknown migration version newer than the executable supports is an
-  operational compatibility error; Forge never attempts a downgrade.
-- Released migration files are immutable. Schema changes use new migrations.
-- `PRAGMA foreign_keys = ON` is required on every database connection.
+1. verify migration 001 is the expected Go-owned schema;
+2. verify there are no legacy `type = 'capture'` rows or `record_tags` rows;
+3. create the target table and indexes;
+4. copy every legacy `type = 'friction'` row as `capture_type = 'friction'`;
+5. map project, classification, workaround, ID, description, and timestamps
+   without loss;
+6. remove superseded tables, triggers, and indexes;
+7. install final target names; and
+8. record migration 002 only after every step succeeds.
 
-The production migration registry currently embeds and applies
-`001_initial.sql`. Schema inspection is separate and read-only: an empty database
-reports version `0` with a migration required, while a database newer than the
-executable is rejected without modification.
+The current known development database contains no records, but implementation and
+tests must not depend on that fact. Existing friction records are preserved. If an
+unexpected legacy capture or tag exists, migration fails with a concise
+compatibility error rather than silently discarding data. A future explicit import
+can define how old thought/idea/etc. captures map to the new model.
 
-If an existing `schema_migrations` table does not have the Go-owned
-`version`, `name`, and `applied_at` layout, Forge reports an incompatible schema
-and makes no migration attempt. In particular, databases from the archived Python
-CLI are context only and are not adopted implicitly. Keep one under a separate
-data directory; a future explicit importer may be considered if users need one.
+Migration 001 is never edited. Released migrations are append-only and immutable.
+A failed migration rolls back completely. An unknown newer migration is rejected;
+Forge never downgrades.
 
-The initial driver decision in `docs/decisions/001-sqlite-driver.md` sets a 250 ms
-SQLite busy timeout. Application tests will confirm the resulting error remains
-actionable under real command execution. Journal and synchronous modes retain
-SQLite defaults until durability measurements justify a change.
+## Repository surface
 
-## Command transactions
+The reset repository exposes one creation path and shared reads:
 
-- Capture and friction creation use one transaction for the record and related
-  tags.
-- A changed status and its `updated_at` value are written atomically.
-- An unchanged status performs no update.
-- Validation and prompt confirmation complete before a write transaction begins.
-- Constraint, lock, cancellation, clock, and randomness failures leave no partial
-  record or update.
+```text
+CreateCapture(ctx, capture)
+FindByID(ctx, id)
+List(ctx, filters)
+```
 
-Transactional capture insertion is implemented: the validated record row and all
-ordered tag rows commit together, and any record or tag failure rolls back the
-entire capture.
+Creation inserts common and matching typed values atomically. Reads validate the
+complete stored shape; malformed rows fail rather than being partially decoded.
 
-Transactional friction insertion is implemented: all shared and friction-specific
-values commit in one record row, capture-only values remain null, no tags are
-created, and any failure rolls back the operation.
+Do not retain separate capture/friction creation paths, universal status updates,
+or the old specialized-review query after callers are migrated. Review repository
+operations are deferred.
 
-Read-only lookup by ID is implemented for both record types. It reconstructs the
-domain record, loads capture tags by ascending position, distinguishes missing
-records from operational failures, and rejects malformed stored values or tag
-positions.
+## Connection and transaction rules
 
-Read-only listing is implemented with deterministic
-`created_at DESC, id DESC` ordering. The primary result set is closed before tag
-hydration to preserve the single-connection limit, empty results are represented
-by a non-null empty collection, and one malformed row fails the whole operation.
-Optional type, project, and status filters combine with AND semantics, and an
-optional positive limit is applied after filtering and deterministic ordering.
+- Enable `PRAGMA foreign_keys = ON` on every connection.
+- Retain the accepted 250 ms busy timeout.
+- Use at most one logical database handle per command.
+- Parameterize values and allow-list dynamic SQL.
+- Validate and confirm before beginning a write transaction.
+- Clock, randomness, constraint, lock, cancellation, and migration failures leave
+  no partial record or schema change.
+- Do not tune journal or synchronous modes without durability evidence.
 
-Status updates read and validate the complete record inside one transaction. A
-real change updates only `status` and `updated_at` atomically; a request for the
-stored status performs no write and preserves the original timestamp. Missing IDs,
-invalid timestamps, and database failures leave the record unchanged.
+## Filesystem security
 
-Review filtering is implemented directly in SQL. It returns only friction in
-`captured`, `reviewing`, or `candidate` status using the standard deterministic
-ordering, and never loads excluded captures or terminal-status friction.
+Default locations remain:
 
-## Initialization and read-only commands
+```text
+Linux: $XDG_DATA_HOME/forge/forge.db
+       falling back to ~/.local/share/forge/forge.db
+macOS: ~/Library/Application Support/forge/forge.db
+override: $FORGE_DATA_DIR/forge.db
+```
 
-Only commands that create records may create the data directory, database, or
-apply migrations automatically. `show`, `list`, and `review` preserve their strict
-read-only guarantees:
+Configured base paths must be absolute. Path resolution is pure. Create the data
+directory lazily with mode `0700`; require directory and database ownership by the
+effective user; reject symlinks; require a regular database file; and create or
+correct database mode `0600`. Use no-follow/open-and-inspect facilities where
+supported to avoid races.
 
-- With no database, `list` and `review` return their successful empty results.
-- With no database, `show` and `update` return not-found without creating one.
-- When an existing database requires a migration, a read-only command returns an
-  actionable operational error instead of applying it.
-
-The update command may open an existing writable database but does not initialize
-a missing database or apply migrations. A future explicit migration command may be
-added if automatic migration during record creation proves insufficient.
-
-The open-existing lifecycle owns the verified directory handle, database-file
-handle, and configured SQLite pool, closing them in reverse order. It supports
-read-only and read-write access, classifies missing storage, rejects any schema
-that is not current, and never creates storage or applies migrations.
-
-The record-creation lifecycle uses the same owned session while securely creating
-missing storage and opening SQLite read-write. It transactionally applies pending
-migrations, reuses current databases without schema changes, rejects newer
-schemas, and closes every acquired resource if initialization fails.
-
-## Index policy
-
-The initial indexes correspond to newest-first listing and individual type, status,
-and project filters. Query-plan testing with mixed friction statuses showed that
-review uses `idx_records_type_created` to preserve result order; the candidate
-`(type, status, created_at, id)` index was redundant and is intentionally omitted.
-Add no further index without a measured query need; later index changes require a
-migration.
-
-## Security and ownership
-
-Path resolution, ownership, permissions, regular-file checks, symlink rejection,
-and no-follow opening follow `docs/blueprint.md`. Tests use temporary directories
-and databases exclusively and never inspect or mutate real Forge user data.
-
-Data-directory preparation creates only the final path component with mode `0700`;
-its parent must already exist. It rejects symbolic links and non-directories, opens
-the directory without following links, verifies effective-user ownership before
-correcting permissions to `0700`, and returns the verified open handle for later
-descriptor-relative database operations.
-
-The open-existing variant applies the same checks but never creates the data
-directory or any parent. A missing path remains absent and returns an error
-classifiable as `os.ErrNotExist`, allowing read-only workflows to select their
-specified empty or not-found behavior without initialization.
-
-Database files are opened relative to that verified directory handle and without
-following links. Read-only and existing read-write modes never create a missing
-file; create mode atomically opens or creates it with mode `0600`. Every mode
-rejects symbolic links and non-regular files, verifies effective-user ownership
-before correcting permissions to `0600`, and returns a verified open handle.
-
-SQLite reopens only an already-created, verified database in `ro` or `rw` mode;
-it is never allowed to create the file itself. Forge brackets the driver's path
-open with descriptor-relative identity checks so a changed file is rejected. Each
-handle permits at most one physical connection at a time and configures foreign
-keys plus the `250 ms` busy timeout on every connection.
-
-Importing the archived Python database is outside this schema. If demand exists,
-provide an explicit importer that validates and converts records into this model.
+Read commands open existing storage without creating directories, databases, or
+migrations. Missing storage is an empty result for list and not-found for show.

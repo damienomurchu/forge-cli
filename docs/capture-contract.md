@@ -1,82 +1,101 @@
 # Capture Command Contract
 
-This document defines the initial product behavior of `forge capture` for the Go
-implementation.
+Forge uses one capture entry point for all captured work.
 
 ## Synopsis
 
 ```text
-forge capture [--quick] [--project PROJECT] [--kind KIND] [--tags TAGS]
-              [--json] DESCRIPTION
+forge capture [--json] DESCRIPTION
+forge capture --quick --type TYPE [type-specific options] [--json] DESCRIPTION
 ```
 
-`DESCRIPTION` is one positional argument. Shell quoting is required when it
-contains spaces. `--` ends option parsing, allowing a description that begins with
-`-`:
+`DESCRIPTION` is exactly one positional argument. `--` ends option parsing so a
+description may begin with `-`. Unknown flags, extra positional arguments, and a
+missing description or flag value are usage errors with exit status `2`.
+
+Supported capture types are `friction`, `action`, `follow-up`, and `decision`.
+
+## Common normalization
+
+- Description must contain non-whitespace text. Surrounding whitespace is removed
+  and internal whitespace is preserved.
+- Optional text is trimmed and becomes absent when empty.
+- Invalid domain values are validation failures with exit status `1`.
+
+## Interactive capture
+
+Without `--quick`, Forge:
+
+1. validates the description;
+2. requires stdin to be a terminal;
+3. prompts for one capture type;
+4. prompts only for fields belonging to that type;
+5. displays a terminal-safe summary of the proposed capture;
+6. requires confirmation; and
+7. only then generates metadata, opens storage, and persists atomically.
+
+The type prompt offers the four types in contract order and does not infer a type
+from the description. `--type` is reserved for quick mode so interactive capture
+always exercises explicit type selection.
+
+Declining confirmation exits `0` and writes nothing. Cancellation exits `130`,
+reports cancellation, restores terminal state, and writes nothing. EOF is a
+distinct operational failure. Non-terminal interactive use exits `1` and writes
+nothing.
+
+## Quick capture
+
+`--quick` performs no prompting and requires `--type TYPE`. Omitting `--type` is a
+usage error. Forge never supplies a default type or infers one. An unsupported type
+is a validation failure.
+
+Quick and interactive capture use the same finalized domain input, validation,
+record construction, atomic repository operation, and result rendering. Quick mode
+must not construct prompt machinery.
+
+## Friction details
+
+Friction supports:
 
 ```text
-forge capture -- "- investigate startup cost"
+--project PROJECT
+--frequency FREQUENCY
+--impact IMPACT
+--category CATEGORY
+--current-workaround TEXT
 ```
 
-Unknown flags, extra positional arguments, and a missing description are usage
-errors with exit status `2`.
-
-## Input normalization
-
-- A description must contain non-whitespace text. Surrounding whitespace is
-  removed; internal whitespace is preserved.
-- `--project` is optional. Surrounding whitespace is removed, and an empty result
-  is treated as absent.
-- `--tags` is optional and accepts comma-separated values. Each tag is trimmed and
-  lowercased. Empty tags are discarded, duplicates are removed, and first-seen
-  order is preserved.
-- `--kind` accepts one of `thought`, `idea`, `observation`, `question`, `decision`,
-  or `seed`.
-- An invalid description, project, tag, or kind is a validation failure with exit
-  status `1`.
-
-## Quick and interactive modes
-
-`--quick` performs a non-interactive capture. When `--kind` is omitted, quick mode
-uses `thought`. Explicit flags always override defaults. Optional project and tags
-remain absent when omitted.
-
-Without `--quick`, an omitted kind is selected interactively. Forge then asks for
-confirmation before writing the record. If all values are supplied explicitly,
-Forge still asks for confirmation unless `--quick` is present.
-
-If interaction is required and stdin is not a terminal, Forge reports a validation
-failure on stderr, exits `1`, and writes nothing. Declining confirmation exits `0`
-and writes nothing. User interruption exits `130`, reports cancellation on stderr,
-restores terminal state, and writes nothing.
-
-Forge does not open or create its database until input is valid and any required
-prompting and confirmation have completed.
-
-## Results
-
-A successful capture creates one record with type `capture` and initial status
-`captured`.
-
-Human mode writes this concise confirmation to stdout:
+Approved values are:
 
 ```text
-Created capture <record-id>
+frequency: daily, weekly, monthly, occasional, unknown
+impact: low, medium, high, unknown
+category: information-finding, repeated-action, context-switching, remembering,
+          verification, waiting, other
 ```
 
-With `--json`, success emits exactly one record object followed by a newline. It
-obeys `docs/cli-contract.md`: no human commentary is mixed into stdout, and the
-record follows `docs/record-contract.md`.
+Interactive friction collects project, frequency, impact, category, and current
+workaround. Optional project and workaround may remain absent. Classification
+defaults are `unknown`, `unknown`, and `other`.
 
-Database, filesystem, randomness, and other operational failures write a concise
-error to stderr, emit nothing to stdout, and exit `1`.
+Quick friction uses the same classification defaults when flags are omitted.
+Explicit flags override defaults. Friction-only flags supplied for another type
+are usage errors rather than silently ignored input.
 
-## Relationship to listing
+## Other typed details
 
-`list` is not a capture subcommand. Records are queried through the top-level
-`forge list` command, so the literal description `list` needs no special syntax:
+Action, follow-up, and decision initially have no additional fields. Their details
+remain explicitly typed in the domain and JSON model but are empty. Do not add
+lifecycle or review metadata until review contracts define it.
+
+## Result
+
+Success creates one capture. Human mode prints:
 
 ```text
-forge capture --quick list
-forge list --type capture
+Created <type> capture <record-id>
 ```
+
+With `--json`, success emits one complete record object followed by a newline and
+no human success text. Operational failures emit nothing to stdout, write a
+concise error to stderr, and exit `1`.

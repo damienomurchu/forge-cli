@@ -1,144 +1,59 @@
 # Record and JSON Contract
 
-This document defines Forge's initial public record model and its JSON
-representation. Storage must implement this product model without dictating it.
+Every persisted record is a capture. `capture_type` determines its validation,
+typed details, future lifecycle, and review behavior.
 
-## Common record fields
-
-Every record contains these fields:
+## Common fields
 
 | Field | JSON type | Meaning |
 |---|---|---|
-| `id` | string | Opaque Forge-generated identifier |
-| `type` | string | `capture` or `friction` |
-| `description` | string | Normalized user-supplied description |
-| `project` | string or null | Normalized project, or `null` when absent |
-| `status` | string | Current lifecycle status |
-| `details` | object | Type-specific fields described below |
+| `id` | string | Opaque Forge-generated capture identifier |
+| `capture_type` | string | `friction`, `action`, `follow-up`, or `decision` |
+| `description` | string | Normalized description |
+| `details` | object | Type-specific details |
 | `created_at` | string | UTC creation timestamp |
 | `updated_at` | string | UTC timestamp of the most recent change |
 
-All fields are present in every emitted record object. Optional text uses JSON
-`null`; it is not omitted and is not represented by an empty string.
+All fields are present. Timestamps use fixed-width UTC RFC 3339 with six fractional
+digits, for example `2026-08-25T12:34:56.123456Z`.
 
-## Capture details
+There is no universal public `status` field in the reset model. Lifecycle fields
+will be added per capture type only after its review contract is approved.
 
-A capture record's `details` object has this shape:
+## Type-specific details
 
-```json
-{
-  "kind": "thought",
-  "tags": ["forge", "performance"]
-}
-```
+Friction details:
 
-`kind` is always present and contains an accepted capture kind. `tags` is always
-present as an array of normalized strings, including `[]` when the capture has no
-tags. Duplicate tags do not appear.
+| Field | JSON type |
+|---|---|
+| `project` | string or null |
+| `frequency` | string |
+| `impact` | string |
+| `category` | string |
+| `current_workaround` | string or null |
 
-## Friction details
-
-A friction record's `details` object has this shape:
+Action, follow-up, and decision currently emit empty details objects:
 
 ```json
-{
-  "frequency": "weekly",
-  "impact": "medium",
-  "category": "repeated-action",
-  "current_workaround": null
-}
+"details": {}
 ```
 
-Frequency, impact, and category are always present and contain accepted values.
-`current_workaround` is a normalized string or `null` when absent.
+Details are discriminated by `capture_type`; a record cannot contain fields from a
+different type. Optional friction text is `null`, never omitted or encoded as an
+empty string.
 
-Fields belonging to the other record type do not appear in `details`. The object
-is never `null`.
+## IDs
 
-## Complete examples
+IDs are opaque outside the domain generator. New unified captures use a stable
+capture identifier form chosen by the implementation and protected by domain
+tests. Command parsing must not infer capture type, timestamp, or validity from an
+ID prefix.
 
-Capture:
+Migration 002 preserves IDs of migration-001 rows. JSON consumers must therefore
+treat IDs as opaque and must not depend on one prefix or length.
 
-```json
-{
-  "id": "cap_7c6b1d85d8ec46e4a4f975e182bf8109",
-  "type": "capture",
-  "description": "Measure command startup time",
-  "project": "forge",
-  "status": "captured",
-  "details": {
-    "kind": "observation",
-    "tags": ["performance", "cli"]
-  },
-  "created_at": "2026-08-25T09:14:03.123456Z",
-  "updated_at": "2026-08-25T09:14:03.123456Z"
-}
-```
+## JSON stability
 
-Friction:
-
-```json
-{
-  "id": "frc_f2308c1797cf4e77ac076e6af5ff1616",
-  "type": "friction",
-  "description": "Releases require repeated manual checks",
-  "project": null,
-  "status": "reviewing",
-  "details": {
-    "frequency": "monthly",
-    "impact": "high",
-    "category": "verification",
-    "current_workaround": "Follow a handwritten checklist"
-  },
-  "created_at": "2026-08-25T09:18:41.654321Z",
-  "updated_at": "2026-08-26T11:02:19.000000Z"
-}
-```
-
-JSON objects are emitted in the field order shown for deterministic, readable
-output, although consumers must not depend on object member order. Output ends with
-one newline.
-
-## Record IDs
-
-Forge generates IDs from 128 bits read from a cryptographically secure random
-source and encodes them as 32 lowercase hexadecimal characters. A type prefix is
-included for readability:
-
-```text
-capture:  cap_<32 lowercase hexadecimal characters>
-friction: frc_<32 lowercase hexadecimal characters>
-```
-
-IDs do not embed timestamps, host information, process IDs, counters, or user data.
-Randomness failure is an operational failure and writes no record. An ID collision
-must never overwrite an existing record; it is handled as an operational failure
-or by generating a fresh cryptographically random ID within a bounded retry policy
-defined by the implementation.
-
-Commands accepting IDs continue to treat them as opaque values. The generation
-format is not used by command dispatch or to infer record type.
-
-## Timestamps
-
-Timestamps are UTC RFC 3339 strings with exactly six fractional digits and an
-uppercase `Z` suffix:
-
-```text
-YYYY-MM-DDTHH:MM:SS.ffffffZ
-```
-
-New records use the same instant for `created_at` and `updated_at`. A real change
-updates only `updated_at`; a successful no-op preserves both timestamps. Times are
-generated by an injected clock so behavior is deterministic in tests.
-
-## Validation and evolution
-
-Stored records must satisfy the same domain rules as newly created records. An
-invalid type, status, type-specific value, ID, timestamp, or `details` shape is a
-stored-data failure; Forge reports the affected record ID where safely available.
-
-The compatibility policy in `docs/cli-contract.md` applies to this schema. Minor
-releases may add optional fields. Removing or renaming fields, changing their JSON
-types, changing required fields to optional, or changing the top-level or `details`
-shape requires a major-version decision.
+Field names and value types become public API when released. Type-specific fields
+are added only with an approved workflow. Invalid records are rejected before
+rendering; output never silently drops mismatched details.
