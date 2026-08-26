@@ -53,6 +53,14 @@ Quick and interactive capture use the same finalized domain input, validation,
 record construction, atomic repository operation, and result rendering. Quick mode
 must not construct prompt machinery.
 
+Implementation status: the unified parser is implemented and tested as the
+currently undispatched `parseUnifiedCaptureRequest` boundary. It finalizes every
+quick type into a validated `ProposedCapture`, preserves JSON intent, applies
+friction defaults, rejects duplicate or type-inappropriate flags, and returns a
+normalized description-only intent for interactive collection. Keep it
+undispatched until the interactive collector and coordinated schema-2 command
+cutover are ready.
+
 ## Friction details
 
 Friction supports:
