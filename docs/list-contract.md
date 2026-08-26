@@ -35,4 +35,7 @@ Implementation status: the target parser is implemented and tested as the
 currently undispatched `parseUnifiedListRequest` boundary. It produces unified
 repository filters, recognizes only the four capture types, normalizes project
 values, validates positive limits, and rejects the removed universal status
-filter. Keep it undispatched until the coordinated schema-2 command cutover.
+filter. The undispatched `executeUnifiedList` boundary passes those filters to the
+unified repository and renders the shared human or JSON result without owning
+storage discovery or session setup. Keep both boundaries undispatched until the
+coordinated schema-2 command cutover.
