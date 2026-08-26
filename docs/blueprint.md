@@ -81,7 +81,7 @@ workflow context only. They are not yet a schema or transition graph.
 
 ## Active command scope
 
-The next implementation stages cover:
+The implemented command surface covers:
 
 ```text
 forge

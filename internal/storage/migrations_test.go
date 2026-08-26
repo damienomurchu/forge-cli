@@ -39,9 +39,10 @@ func TestApplyMigrationsInitializesFreshDatabase(t *testing.T) {
 		t.Errorf("InspectSchema() = %+v, want current version", state)
 	}
 
-	for _, table := range []string{"schema_migrations", "records", "record_tags"} {
+	for _, table := range []string{"schema_migrations", "records"} {
 		assertTableExists(t, db, table)
 	}
+	assertTableMissing(t, db, "record_tags")
 	var count int
 	if err := db.QueryRow(
 		`SELECT COUNT(*) FROM schema_migrations
@@ -54,7 +55,7 @@ func TestApplyMigrationsInitializesFreshDatabase(t *testing.T) {
 	}
 }
 
-func TestApplyMigrationsDoesNotApplyRegisteredFutureMigration(t *testing.T) {
+func TestApplyMigrationsAppliesUnifiedCaptureMigration(t *testing.T) {
 	if got := migrationFiles[len(migrationFiles)-1]; got.version != 2 || got.name != "002_unified_captures.sql" {
 		t.Fatalf("last registered migration = %+v, want staged migration 002", got)
 	}
@@ -63,13 +64,13 @@ func TestApplyMigrationsDoesNotApplyRegisteredFutureMigration(t *testing.T) {
 		t.Fatalf("ApplyMigrations() error = %v", err)
 	}
 	assertSchemaVersion(t, db, LatestSchemaVersion)
-	assertTableExists(t, db, "record_tags")
+	assertTableMissing(t, db, "record_tags")
 	var count int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE version = 2`).Scan(&count); err != nil {
 		t.Fatalf("read staged migration count error = %v", err)
 	}
-	if count != 0 {
-		t.Errorf("staged migration count = %d, want 0", count)
+	if count != 1 {
+		t.Errorf("unified migration count = %d, want 1", count)
 	}
 }
 
@@ -87,8 +88,8 @@ func TestApplyMigrationsIsIdempotent(t *testing.T) {
 	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatalf("read migration count error = %v", err)
 	}
-	if count != 1 {
-		t.Errorf("migration count = %d, want 1", count)
+	if count != 2 {
+		t.Errorf("migration count = %d, want 2", count)
 	}
 }
 
@@ -321,8 +322,14 @@ func TestUnifiedCaptureMigrationRejectsUnrepresentableLegacyDataAndRollsBack(t *
 func openInitialSchemaDatabase(t *testing.T) *sql.DB {
 	t.Helper()
 	db := openTestSQLite(t)
-	if err := ApplyMigrations(context.Background(), db); err != nil {
-		t.Fatalf("ApplyMigrations() error = %v", err)
+	query, err := forgemigrations.Files.ReadFile("001_initial.sql")
+	if err != nil {
+		t.Fatalf("read initial migration error = %v", err)
+	}
+	if err := applyMigration(context.Background(), db, migration{
+		version: 1, name: "001_initial.sql", query: string(query),
+	}); err != nil {
+		t.Fatalf("apply initial migration error = %v", err)
 	}
 	assertSchemaVersion(t, db, 1)
 	return db
@@ -443,7 +450,7 @@ func TestInspectSchemaRejectsNewerDatabase(t *testing.T) {
 	if state != (SchemaState{}) {
 		t.Errorf("InspectSchema() state = %+v, want zero", state)
 	}
-	want := "database schema version 2 is newer than supported version 1"
+	want := "database schema version 3 is newer than supported version 2"
 	if err == nil || err.Error() != want {
 		t.Fatalf("InspectSchema() error = %v, want %q", err, want)
 	}

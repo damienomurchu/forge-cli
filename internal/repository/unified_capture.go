@@ -7,8 +7,8 @@ import (
 	"github.com/damienomurchu/forge-cli/internal/domain"
 )
 
-// CreateUnifiedCapture stores a validated capture in the staged unified schema.
-// It remains separate from the legacy CreateCapture method until command cutover.
+// CreateUnifiedCapture stores a validated capture in the active unified schema.
+// Its transitional name remains until unreachable schema-1 code is removed.
 func (r *Repository) CreateUnifiedCapture(ctx context.Context, capture domain.Capture) error {
 	if err := capture.Validate(); err != nil {
 		return fmt.Errorf("validate unified capture: %w", err)

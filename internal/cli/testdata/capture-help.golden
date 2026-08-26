@@ -1,13 +1,16 @@
-Capture a thought, idea, or observation.
+Capture friction, an action, a follow-up, or a decision.
 
 Usage:
-  forge capture [--quick] [--project PROJECT] [--kind KIND]
-                [--tags TAGS] [--json] DESCRIPTION
+  forge capture [--json] DESCRIPTION
+  forge capture --quick --type TYPE [type-specific options] [--json] DESCRIPTION
 
 Flags:
-  -h, --help             Show help
-      --kind KIND        Set capture kind (default: thought)
-      --project PROJECT  Associate the capture with a project
-      --quick            Capture without confirmation
-      --tags TAGS        Add comma-separated tags
-      --json             Write the created record as JSON
+  -h, --help                     Show help
+      --category CATEGORY        Set friction category (default: other)
+      --current-workaround TEXT  Record the current friction workaround
+      --frequency FREQUENCY      Set friction frequency (default: unknown)
+      --impact IMPACT            Set friction impact (default: unknown)
+      --json                     Write the created capture as JSON
+      --project PROJECT          Associate friction with a project
+      --quick                    Capture without prompting
+      --type TYPE                Set friction, action, follow-up, or decision

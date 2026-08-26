@@ -53,18 +53,20 @@ Quick and interactive capture use the same finalized domain input, validation,
 record construction, atomic repository operation, and result rendering. Quick mode
 must not construct prompt machinery.
 
-Implementation status: the unified parser and interactive collector are
-implemented and tested as currently undispatched boundaries. The parser finalizes
+Implementation status: the live capture command uses the unified parser,
+interactive collector, persistence boundary, schema-2 repository, and shared
+output. The parser finalizes
 every quick type into a validated `ProposedCapture`, preserves JSON intent,
 applies friction defaults, rejects duplicate or type-inappropriate flags, and
 returns normalized description-only intent for interactive collection. The
 collector prompts for the type and only its relevant fields, constructs the same
 validated proposal, writes the shared summary, and requires confirmation. Neither
-boundary generates persistence metadata or accesses storage. The undispatched
+boundary generates persistence metadata or accesses storage. The
 `persistUnifiedCapture` boundary adds metadata to a confirmed proposal, stores it
 through the unified repository, and writes the shared human or JSON result. It
-does not own storage session setup or activate schema 2. Keep these boundaries
-undispatched until the coordinated schema-2 command cutover is ready.
+does not own storage session setup; the live handler opens storage only after
+quick validation or interactive confirmation and withholds result output until
+the session closes successfully.
 
 ## Friction details
 

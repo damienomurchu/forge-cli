@@ -14,6 +14,7 @@ import (
 
 	"github.com/damienomurchu/forge-cli/internal/domain"
 	"github.com/damienomurchu/forge-cli/internal/storage"
+	forgemigrations "github.com/damienomurchu/forge-cli/migrations"
 )
 
 func TestCreateCaptureStoresRecordAndOrderedTags(t *testing.T) {
@@ -207,8 +208,16 @@ func openTestRepository(t *testing.T) (*Repository, *sql.DB) {
 		t.Fatalf("OpenSQLite() error = %v", err)
 	}
 	t.Cleanup(func() { db.Close() })
-	if err := storage.ApplyMigrations(context.Background(), db); err != nil {
-		t.Fatalf("ApplyMigrations() error = %v", err)
+	query, err := forgemigrations.Files.ReadFile("001_initial.sql")
+	if err != nil {
+		t.Fatalf("read initial migration error = %v", err)
+	}
+	if _, err := db.Exec(string(query)); err != nil {
+		t.Fatalf("apply initial migration error = %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO schema_migrations(version, name, applied_at)
+		VALUES (1, '001_initial.sql', '2026-08-25T12:00:00.000Z')`); err != nil {
+		t.Fatalf("record initial migration error = %v", err)
 	}
 	repository, err := New(db)
 	if err != nil {

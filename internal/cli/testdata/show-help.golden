@@ -1,4 +1,4 @@
-Show one complete record.
+Show one complete capture.
 
 Usage:
   forge show [--json] RECORD_ID

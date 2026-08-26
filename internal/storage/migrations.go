@@ -9,7 +9,7 @@ import (
 	forgemigrations "github.com/damienomurchu/forge-cli/migrations"
 )
 
-const LatestSchemaVersion = 1
+const LatestSchemaVersion = 2
 
 // ErrIncompatibleSchema identifies an existing database whose migration
 // metadata was not created by this Go implementation.
@@ -26,8 +26,6 @@ var migrationFiles = []struct {
 	name    string
 }{
 	{version: 1, name: "001_initial.sql"},
-	// Migration 002 is embedded and tested but remains inactive until the
-	// unified repository and command cutover raises LatestSchemaVersion.
 	{version: 2, name: "002_unified_captures.sql"},
 }
 

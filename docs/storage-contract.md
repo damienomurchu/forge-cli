@@ -77,12 +77,10 @@ follow-up, and decision require no placeholder columns.
 
 ## Migration 002
 
-Implementation status: `002_unified_captures.sql` is embedded, registered, and
-tested directly, but `LatestSchemaVersion` intentionally remains `1`. Activating
-version 2 before the unified repository and command cutover would make current
-migration-001 queries incompatible with newly opened databases. Raise the active
-version to `2` as part of that cutover; the migration runner explicitly skips
-registered migrations newer than the active version.
+Implementation status: `002_unified_captures.sql` is embedded, registered, tested,
+and active as `LatestSchemaVersion = 2`. Creation commands migrate schema-1
+databases transactionally; read-only commands report that migration is required
+without modifying storage.
 
 Migration 002 must run in one transaction and:
 
@@ -119,16 +117,13 @@ FindByID(ctx, id)
 List(ctx, filters)
 ```
 
-Implementation status: unified schema creation is available as the transitional
-`CreateUnifiedCapture(ctx, capture)` method and is tested against staged schema 2.
-The legacy schema-1 method already owns the final `CreateCapture` name. Rename the
-unified method only when legacy callers are removed during cutover. Unified lookup
-is similarly available as `FindUnifiedCaptureByID(ctx, id)` with complete typed
-decoding, stored-data validation, stable not-found classification, and migrated
-friction-ID support; it can take the final `FindByID` name at cutover. Unified
-listing is available as `ListUnifiedCaptures(ctx, filters)` with AND-composed type,
-friction-project, and positive-limit filters, deterministic newest-first ordering,
-complete typed decoding, and verified use of the schema-2 filter indexes.
+Implementation status: the live CLI uses the transitional
+`CreateUnifiedCapture`, `FindUnifiedCaptureByID`, and `ListUnifiedCaptures` method
+names against schema 2. They provide complete typed decoding, stored-data
+validation, stable not-found classification, migrated friction-ID support,
+AND-composed filters, deterministic ordering, and verified index use. Rename them
+to the final repository surface when the now-unreachable schema-1 methods are
+removed during cleanup.
 
 Creation inserts common and matching typed values atomically. Reads validate the
 complete stored shape; malformed rows fail rather than being partially decoded.

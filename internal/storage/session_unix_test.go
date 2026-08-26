@@ -231,7 +231,7 @@ func TestOpenExistingRejectsMigrationRequired(t *testing.T) {
 	if !errors.Is(err, ErrMigrationRequired) {
 		t.Fatalf("OpenExisting() error = %v, want ErrMigrationRequired", err)
 	}
-	if !strings.Contains(err.Error(), "schema version 0, want 1") {
+	if !strings.Contains(err.Error(), "schema version 0, want 2") {
 		t.Errorf("OpenExisting() error = %v, want version detail", err)
 	}
 }

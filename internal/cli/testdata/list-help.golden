@@ -1,11 +1,10 @@
-List records newest first.
+List captures newest first.
 
 Usage:
-  forge list [--limit N] [--type TYPE] [--project PROJECT] [--status STATUS]
-             [--json]
+  forge list [--limit N] [--type TYPE] [--project PROJECT] [--json]
 
 Output:
-  <id>  <type>  <status>  <description>
+  <id>  <capture-type>  <description>
 
 Missing storage and empty results produce no output and succeed.
 
@@ -14,5 +13,4 @@ Flags:
       --json             Write records as a JSON array
       --limit N          Return at most N records
       --project PROJECT  Filter by project
-      --status STATUS    Filter by lifecycle status
-      --type TYPE        Filter by capture or friction
+      --type TYPE        Filter by capture type

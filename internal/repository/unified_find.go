@@ -27,8 +27,9 @@ type storedUnifiedCapture struct {
 	updatedAt         string
 }
 
-// FindUnifiedCaptureByID returns a complete capture from the staged unified
-// schema without modifying the database.
+// FindUnifiedCaptureByID returns a complete capture from the active unified
+// schema without modifying the database. Its transitional name remains until
+// repository cleanup.
 func (r *Repository) FindUnifiedCaptureByID(ctx context.Context, id domain.ID) (domain.Capture, error) {
 	stored, err := scanStoredUnifiedCapture(r.db.QueryRowContext(ctx,
 		`SELECT `+unifiedCaptureColumns+` FROM records WHERE id = ?`,

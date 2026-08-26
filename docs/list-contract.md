@@ -31,11 +31,11 @@ An empty human result writes nothing. JSON emits a complete record array followe
 by a newline, including `[]` when empty. Listing is strictly read-only and never
 initializes or migrates missing storage.
 
-Implementation status: the target parser is implemented and tested as the
-currently undispatched `parseUnifiedListRequest` boundary. It produces unified
+Implementation status: the live list command uses `parseUnifiedListRequest` and
+`executeUnifiedList`. The parser produces unified
 repository filters, recognizes only the four capture types, normalizes project
 values, validates positive limits, and rejects the removed universal status
-filter. The undispatched `executeUnifiedList` boundary passes those filters to the
+filter. The executor passes those filters to the
 unified repository and renders the shared human or JSON result without owning
-storage discovery or session setup. Keep both boundaries undispatched until the
-coordinated schema-2 command cutover.
+storage discovery or session setup. The live handler retains that ownership and
+keeps missing-storage reads non-creating.

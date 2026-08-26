@@ -26,8 +26,7 @@ Show is strictly read-only. It does not initialize or migrate storage, change
 timestamps, or alter type-specific details.
 
 Implementation status: the existing `parseShow` boundary already satisfies the
-reset syntax and opaque-ID validation rules. The target lookup and rendering path
-is implemented and tested as the currently undispatched `executeUnifiedShow`
-boundary. It uses the unified repository and shared human or JSON renderers while
-leaving storage discovery, session setup, and user-facing not-found presentation
-to the coordinated schema-2 command cutover.
+reset syntax and opaque-ID validation rules. The live handler uses
+`executeUnifiedShow` with the unified repository and shared human or JSON
+renderers while retaining storage discovery, session setup, and user-facing
+not-found presentation.
