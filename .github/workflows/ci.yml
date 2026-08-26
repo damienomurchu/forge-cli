@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux AMD64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Verify runner architecture
+        run: test "$(go env GOOS)/$(go env GOARCH)" = "linux/amd64"
+
+      - name: Check formatting
+        run: |
+          unformatted="$(git ls-files -z -- '*.go' | xargs -0 gofmt -l)"
+          if [[ -n "$unformatted" ]]; then
+            printf 'Go files need formatting:\n%s\n' "$unformatted"
+            exit 1
+          fi
+
+      - name: Check module files
+        run: go mod tidy -diff
+
+      - name: Run static analysis
+        run: go vet ./...
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Run race tests
+        run: go test -race ./...
+
+      - name: Report coverage
+        run: go test -cover ./...
+
+      - name: Scan for known vulnerabilities
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
+
+      - name: Build CGO-free Linux executable
+        env:
+          CGO_ENABLED: "0"
+        run: go build -trimpath -o bin/forge ./cmd/forge
+
+      - name: Smoke-test executable and completions
+        run: |
+          test "$(./bin/forge --version)" = "forge dev"
+          ./bin/forge --help >/dev/null
+          ./bin/forge completion bash | bash -n
+          ./bin/forge completion fish >/dev/null
+          ./bin/forge completion zsh >/dev/null
+
+      - name: Verify macOS ARM64 cross-build
+        env:
+          CGO_ENABLED: "0"
+          GOOS: darwin
+          GOARCH: arm64
+        run: go build -trimpath -o bin/forge-darwin-arm64 ./cmd/forge
+
+      - name: Test benchmark harness
+        run: scripts/test-benchmark.sh
+
+  macos:
+    name: macOS ARM64
+    runs-on: macos-15
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Verify runner architecture
+        run: test "$(go env GOOS)/$(go env GOARCH)" = "darwin/arm64"
+
+      - name: Check module files
+        run: go mod tidy -diff
+
+      - name: Run static analysis
+        run: go vet ./...
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Run race tests
+        run: go test -race ./...
+
+      - name: Build native CGO-free executable
+        env:
+          CGO_ENABLED: "0"
+        run: go build -trimpath -o bin/forge ./cmd/forge
+
+      - name: Smoke-test executable and completions
+        run: |
+          test "$(./bin/forge --version)" = "forge dev"
+          ./bin/forge --help >/dev/null
+          ./bin/forge completion bash | bash -n
+          ./bin/forge completion zsh | zsh -n
+          if command -v fish >/dev/null; then
+            ./bin/forge completion fish | fish -n
+          fi

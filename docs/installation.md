@@ -7,6 +7,8 @@ Forge supports these release targets:
 - Linux on AMD64
 - macOS on Apple silicon (ARM64)
 
+The test suite and race detector run natively on both target platforms in CI.
+
 Forge does not currently support Windows. Other operating systems and architectures
 may compile but are not release targets and are not supported.
 

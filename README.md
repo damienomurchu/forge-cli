@@ -1,5 +1,7 @@
 # Forge CLI
 
+[![CI](https://github.com/damienomurchu/forge-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/damienomurchu/forge-cli/actions/workflows/ci.yml)
+
 Forge is a fast, private command-line tool for capturing work that should not be
 lost. Captures are stored locally in SQLite and have one of four types:
 `friction`, `action`, `follow-up`, or `decision`.
