@@ -13,9 +13,9 @@ func TestCompletionScripts(t *testing.T) {
 		shell string
 		want  []string
 	}{
-		{shell: "bash", want: []string{"complete -F _forge_completion forge", "friction action follow-up decision", "--frequency"}},
-		{shell: "fish", want: []string{"complete -c forge", "friction action follow-up decision", "current-workaround"}},
-		{shell: "zsh", want: []string{"#compdef forge", "compdef _forge forge", "information-finding"}},
+		{shell: "bash", want: []string{"complete -F _forge_completion forge", "friction action follow-up decision", "--frequency", "delete"}},
+		{shell: "fish", want: []string{"complete -c forge", "friction action follow-up decision", "current-workaround", "delete -d 'Delete a capture'"}},
+		{shell: "zsh", want: []string{"#compdef forge", "compdef _forge forge", "information-finding", "delete\\:Delete"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.shell, func(t *testing.T) {

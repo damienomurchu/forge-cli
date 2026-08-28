@@ -34,11 +34,12 @@ existing database requires migration and do not modify it.
 
 ## Repository behavior
 
-The repository provides one creation path and shared find and list operations.
-Creation writes the complete common and matching typed values atomically. Reads
-validate the complete stored shape and fail on malformed data rather than returning
-partially decoded records. List filters combine with AND semantics and preserve
-deterministic ordering.
+The repository provides one creation path, shared find and list operations, and
+deletion by opaque ID. Creation writes the complete common and matching typed
+values atomically. Deletion removes exactly one matching record atomically and
+reports not found when no row matches. Reads validate the complete stored shape
+and fail on malformed data rather than returning partially decoded records. List
+filters combine with AND semantics and preserve deterministic ordering.
 
 Repository operations use parameterized values. Any dynamic SQL identifiers or
 clauses must be selected from an allow-list.
@@ -70,5 +71,8 @@ and database ownership by the effective user, reject symbolic links, require a
 regular database file, and create or correct database mode `0600`. Use
 no-follow/open-and-inspect facilities where supported to avoid races.
 
-Read commands open only existing storage. Missing storage is an empty result for
-list and not found for show; it must not create directories, databases, or schema.
+Commands that read or delete records open only existing storage. Missing storage
+is an empty result for list and not found for show or delete; it must not create
+directories, databases, or schema. Delete uses a read-write connection but, like
+read commands, reports when an existing database requires migration rather than
+applying migrations.

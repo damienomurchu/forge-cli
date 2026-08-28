@@ -1,0 +1,7 @@
+Delete one capture permanently.
+
+Usage:
+  forge delete RECORD_ID
+
+Flags:
+  -h, --help  Show help

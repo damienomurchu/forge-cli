@@ -7,6 +7,7 @@ Usage:
 Commands:
   capture    Capture friction, an action, a follow-up, or a decision
   completion Generate shell completion scripts
+  delete     Delete a capture
   list       List captures
   show       Show a capture
 

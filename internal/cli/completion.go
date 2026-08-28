@@ -58,7 +58,7 @@ _forge_completion() {
     esac
 
     if [[ $COMP_CWORD -eq 1 ]]; then
-        COMPREPLY=($(compgen -W "capture completion list show --help --version" -- "$current"))
+        COMPREPLY=($(compgen -W "capture completion delete list show --help --version" -- "$current"))
         return
     fi
 
@@ -68,6 +68,9 @@ _forge_completion() {
             ;;
         completion)
             COMPREPLY=($(compgen -W "bash fish zsh --help -h" -- "$current"))
+            ;;
+        delete)
+            COMPREPLY=($(compgen -W "--help -h" -- "$current"))
             ;;
         list)
             COMPREPLY=($(compgen -W "--help --json --limit --project --type -h" -- "$current"))
@@ -86,6 +89,7 @@ complete -c forge -n __fish_use_subcommand -s h -l help -d 'Show help'
 complete -c forge -n __fish_use_subcommand -l version -d 'Show version'
 complete -c forge -n __fish_use_subcommand -a capture -d 'Capture work'
 complete -c forge -n __fish_use_subcommand -a completion -d 'Generate shell completion scripts'
+complete -c forge -n __fish_use_subcommand -a delete -d 'Delete a capture'
 complete -c forge -n __fish_use_subcommand -a list -d 'List captures'
 complete -c forge -n __fish_use_subcommand -a show -d 'Show a capture'
 
@@ -101,6 +105,8 @@ complete -c forge -n '__fish_seen_subcommand_from capture' -l current-workaround
 
 complete -c forge -n '__fish_seen_subcommand_from completion' -s h -l help -d 'Show help'
 complete -c forge -n '__fish_seen_subcommand_from completion' -a 'bash fish zsh'
+
+complete -c forge -n '__fish_seen_subcommand_from delete' -s h -l help -d 'Show help'
 
 complete -c forge -n '__fish_seen_subcommand_from list' -s h -l help -d 'Show help'
 complete -c forge -n '__fish_seen_subcommand_from list' -l json -d 'Write JSON'
@@ -121,7 +127,7 @@ _forge() {
     _arguments -C \
         '(-h --help)'{-h,--help}'[Show help]' \
         '--version[Show version]' \
-        '1:command:((capture\:Capture\ work completion\:Generate\ shell\ completion\ scripts list\:List\ captures show\:Show\ a\ capture))' \
+        '1:command:((capture\:Capture\ work completion\:Generate\ shell\ completion\ scripts delete\:Delete\ a\ capture list\:List\ captures show\:Show\ a\ capture))' \
         '*::argument:->arguments'
 
     case "$words[2]" in
@@ -142,6 +148,11 @@ _forge() {
             _arguments \
                 '(-h --help)'{-h,--help}'[Show help]' \
                 '1:shell:(bash fish zsh)'
+            ;;
+        delete)
+            _arguments \
+                '(-h --help)'{-h,--help}'[Show help]' \
+                '1:record ID:'
             ;;
         list)
             _arguments \

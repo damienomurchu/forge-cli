@@ -24,7 +24,7 @@ main -> cli -> domain + prompt + output + repository -> config + storage
 - Domain code owns normalization and validation without SQL or terminal knowledge.
 - Prompt code collects input and never persists it.
 - Output code owns terminal-safe human output and stable JSON.
-- Repository code owns queries and complete record decoding.
+- Repository code owns queries, complete record decoding, and record deletion.
 - Storage code owns paths, filesystem checks, connections, and migrations.
 - `main` owns process exit; lower layers return errors.
 
@@ -38,7 +38,8 @@ behind their adapters.
 - Interactive writes occur only after explicit confirmation.
 - A command opens at most one logical database handle.
 - Writes and migrations are atomic.
-- Read-only commands do not create storage or apply migrations.
+- Commands that operate on existing records do not create missing storage or
+  apply migrations.
 - Human output visibly escapes terminal and bidirectional controls.
 - JSON stdout contains only the documented JSON value.
 - Lists use deterministic newest-first ordering.

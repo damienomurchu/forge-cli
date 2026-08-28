@@ -12,6 +12,7 @@ lost. Captures are stored locally in SQLite and have one of four types:
 forge capture DESCRIPTION
 forge capture --quick --type TYPE DESCRIPTION
 forge completion SHELL
+forge delete RECORD_ID
 forge list [--limit N] [--type TYPE] [--project PROJECT] [--json]
 forge show [--json] RECORD_ID
 ```
@@ -27,6 +28,8 @@ metadata.
 Type-aware review workflows are planned but not yet specified or implemented.
 
 Run `forge --help` or `forge <command> --help` for complete command usage.
+`forge delete RECORD_ID` permanently deletes the capture with that opaque ID and
+reports an error when it does not exist.
 
 ## Installation and platforms
 

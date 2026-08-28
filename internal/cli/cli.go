@@ -28,6 +28,7 @@ Usage:
 Commands:
   capture    Capture friction, an action, a follow-up, or a decision
   completion Generate shell completion scripts
+  delete     Delete a capture
   list       List captures
   show       Show a capture
 
@@ -80,6 +81,15 @@ Usage:
 Flags:
   -h, --help  Show help
       --json   Write the record as JSON
+`
+
+const deleteHelp = `Delete one capture permanently.
+
+Usage:
+  forge delete RECORD_ID
+
+Flags:
+  -h, --help  Show help
 `
 
 const completionHelp = `Generate a shell completion script.
@@ -153,6 +163,8 @@ func Run(ctx context.Context, args []string, rt Runtime, version string) error {
 		return runCapture(ctx, args[1:], rt)
 	case args[0] == "completion":
 		return runCompletion(args[1:], rt)
+	case args[0] == "delete":
+		return runDelete(ctx, args[1:], rt)
 	case args[0] == "list":
 		return runList(ctx, args[1:], rt)
 	case args[0] == "show":
@@ -160,6 +172,41 @@ func Run(ctx context.Context, args []string, rt Runtime, version string) error {
 	default:
 		return &UsageError{Argument: args[0]}
 	}
+}
+
+func runDelete(ctx context.Context, args []string, rt Runtime) error {
+	if commandHelpRequested(args) {
+		_, err := io.WriteString(rt.Stdout, deleteHelp)
+		return err
+	}
+	id, err := parseDelete(args)
+	if err != nil {
+		return err
+	}
+	databasePath, err := config.ResolveDatabasePath(rt.GOOS, rt.Env)
+	if err != nil {
+		return fmt.Errorf("resolve database path: %w", err)
+	}
+	session, err := storage.OpenExisting(ctx, databasePath, rt.EUID, storage.DatabaseReadWrite)
+	if errors.Is(err, storage.ErrStorageNotFound) {
+		return fmt.Errorf("record %q not found", id.String())
+	}
+	if err != nil {
+		return fmt.Errorf("open storage for delete: %w", err)
+	}
+	repo, err := repository.New(session.Database())
+	if err != nil {
+		return errors.Join(err, session.Close())
+	}
+	var rendered bytes.Buffer
+	err = executeDelete(ctx, id, repo, &rendered)
+	if errors.Is(err, repository.ErrRecordNotFound) {
+		return errors.Join(fmt.Errorf("record %q not found", id.String()), session.Close())
+	}
+	if err != nil {
+		return errors.Join(err, session.Close())
+	}
+	return closeAndPublish(session, &rendered, rt.Stdout, "delete")
 }
 
 func runCapture(ctx context.Context, args []string, rt Runtime) error {
@@ -319,6 +366,23 @@ func parseShow(args []string) (domain.ID, bool, error) {
 		return "", false, err
 	}
 	return id, jsonOutput, nil
+}
+
+func parseDelete(args []string) (domain.ID, error) {
+	if len(args) == 0 {
+		return "", &UsageError{Message: "record ID is required"}
+	}
+	if len(args) > 1 {
+		return "", &UsageError{Argument: args[1]}
+	}
+	if strings.HasPrefix(args[0], "-") {
+		return "", &UsageError{Argument: args[0]}
+	}
+	id := domain.ID(args[0])
+	if err := validateLookupID(id); err != nil {
+		return "", err
+	}
+	return id, nil
 }
 
 // closeAndPublish ensures a successful command result is not exposed until its
